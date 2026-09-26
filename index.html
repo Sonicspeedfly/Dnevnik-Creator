@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=Lobster&family=Lora:wght@400;700&family=Montserrat:wght@400;600;700&family=Noto+Sans:wght@400;700&family=Noto+Serif:wght@400;700&family=PT+Sans:wght@400;700&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Playfair+Display:wght@400;700;900&display=swap">
 
 <!-- Tailwind CSS (CDN) -->
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js" onerror="window.__twFailed=true"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js" onerror="window.__twFailed=true"></script>
 
 <!-- JSZip, FileSaver, jsPDF (CDN). Если основной CDN недоступен, приложение само догрузит их с зеркал. -->
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" onerror="(window.__libFailed=window.__libFailed||[]).push('jszip')"></script>
@@ -18,10 +18,15 @@
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="(window.__libFailed=window.__libFailed||[]).push('jspdf')"></script>
 
 <style>
-  /* Базовые компоненты написаны на обычном CSS, чтобы интерфейс оставался рабочим даже без Tailwind */
+  /* Базовые компоненты написаны на обычном CSS, чтобы интерфейс оставался рабочим даже без Tailwind.
+     Порядок слоёв совпадает с Tailwind v4, поэтому утилиты (text-xs, flex, grid…) всегда сильнее компонентов. */
+  @layer theme, base, components, utilities;
+  @layer base {
   html, body { height: 100%; }
   body { margin: 0; font-family: "PT Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f1f5f9; color: #1e293b; }
   button { font: inherit; }
+  }
+  @layer components {
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; border-radius: .6rem; padding: .42rem .72rem; font-size: .84rem; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s, opacity .15s; white-space: nowrap; user-select: none; }
   .btn:hover { background: #f1f5f9; border-color: #94a3b8; }
   .btn:focus-visible { outline: 2px solid #818cf8; outline-offset: 1px; }
@@ -63,7 +68,8 @@
   .stu-item[aria-current="true"] { background: #eef2ff; border-color: #a5b4fc; }
   .stu-item.drop-hover { background: #fef3c7; border-color: #f59e0b; }
   .stu-item .row-actions { opacity: 0; transition: opacity .15s; }
-  .stu-item:hover .row-actions, .stu-item[aria-current="true"] .row-actions { opacity: 1; }
+  .stu-item:hover .row-actions, .stu-item[aria-current="true"] .row-actions, .stu-item:focus-within .row-actions, .row-actions.show { opacity: 1; }
+  .stu-item:focus-visible { outline: 2px solid #818cf8; outline-offset: 1px; }
   .avatar { width: 36px; height: 46px; border-radius: 9px; object-fit: cover; background: #e2e8f0; flex: none; border: 1px solid #cbd5e1; }
   .avatar-missing { display: grid; place-items: center; color: #b45309; background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 5px, #fde68a 5px, #fde68a 10px); border-color: #f59e0b; }
   .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.35rem; height: 1.35rem; padding: 0 .25rem; border-radius: .4rem; font-size: .7rem; font-weight: 800; }
@@ -84,6 +90,7 @@
   .sec[open] > summary .chev { transform: rotate(90deg); }
   #dropOverlay { pointer-events: none; }
   .tw-missing-banner { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 9999; background: #fff7ed; color: #7c2d12; border: 1px solid #fdba74; border-radius: 10px; padding: 10px 14px; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+  }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased">
@@ -139,9 +146,10 @@
           <button data-filter="nophoto">Без фото</button>
           <button data-filter="issues">Проблемы</button>
         </div>
+        <select id="classFilter" class="inp inp-sm hidden" title="Показать только один класс"></select>
       </div>
       <div id="demoNote" class="hidden"></div>
-      <ol id="studentList" class="thin-scroll max-h-[70vh] min-h-[120px] flex-1 space-y-1 overflow-y-auto p-2 lg:max-h-none" aria-label="Список учеников"></ol>
+      <ol id="studentList" class="thin-scroll relative max-h-[70vh] min-h-[120px] flex-1 space-y-1 overflow-y-auto p-2 lg:max-h-none" role="listbox" aria-label="Список учеников"></ol>
       <div id="unmatchedBox" class="hidden border-t border-slate-200 bg-amber-50/60 p-3"></div>
       <div class="flex gap-2 border-t border-slate-200 p-3">
         <button class="btn btn-sm flex-1" data-action="add-student"><span data-icon="plus"></span>Ученик</button>
@@ -164,7 +172,7 @@
           </div>
           <label class="chk" title="Показать линию сгиба (корешок)"><input type="checkbox" data-guide="spine">Корешок</label>
           <label class="chk" title="Показать безопасные поля"><input type="checkbox" data-guide="safe">Поля</label>
-          <button class="btn btn-sm" id="layoutModeBtn" data-action="toggle-layout" title="Перетаскивать рамку фото и плашку с надписью (общий макет для всех)"><span data-icon="move"></span>Двигать макет</button>
+          <button class="btn btn-sm" id="layoutModeBtn" aria-pressed="false" data-action="toggle-layout" title="Перетаскивать рамку фото и плашку с надписью (общий макет для всех)"><span data-icon="move"></span>Двигать макет</button>
         </div>
       </div>
       <div id="canvasWrap" class="checker relative min-h-[320px] flex-1 overflow-hidden">
@@ -209,7 +217,7 @@
 </div>
 
 <div id="modalRoot"></div>
-<div id="toasts" class="pointer-events-none fixed right-4 top-4 z-[60] flex w-[min(380px,calc(100%-2rem))] flex-col gap-2"></div>
+<div id="toasts" class="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-[min(380px,calc(100%-2rem))] flex-col gap-2" role="status" aria-live="polite"></div>
 
 <input type="file" id="filePhotos" accept="image/*,.heic,.heif" multiple hidden>
 <input type="file" id="fileFolder" webkitdirectory directory multiple hidden>
@@ -217,6 +225,7 @@
 <input type="file" id="fileCover" accept="image/*" hidden>
 <input type="file" id="fileProject" accept=".json,application/json" hidden>
 <input type="file" id="fileTable" accept=".csv,.tsv,.txt,.xlsx,.xls,.ods,text/csv,text/plain" hidden>
+<input type="file" id="fileTemplate" accept=".json,application/json" hidden>
 
 <script>
 /*!
@@ -252,8 +261,7 @@ const DESIGN = {
   stitchPeriod: 18 / REF_H, stitchDash: 12 / REF_H, stitchPhase: 8 / REF_H,
   cleanRows: [2 / REF_H, 58 / REF_H],     // полоса «чистой» джинсы без предметов
   title: [212 / REF_W, 266 / REF_H, 418 / REF_W, 372 / REF_H], // надпись «Дневник школьный 1‑4 класс»
-  protect: [                               // зоны, где рядом с надписью лежат листья (стираем осторожно)
-    [378 / REF_W, 262 / REF_H, 420 / REF_W, 300 / REF_H],
+  protect: [                               // листья колокольчика слева от «Д» — там стираем только явный малиновый цвет
     [205 / REF_W, 262 / REF_H, 252 / REF_W, 292 / REF_H],
   ],
   // клетка тетрадного листа — в пикселях эталона
@@ -261,7 +269,27 @@ const DESIGN = {
   frame: { cx: 312 / REF_W, cy: 318 / REF_H }, // центр тетрадного листа под портрет
 };
 
-const DEFAULT_TEMPLATE = '# Дневник\n{ученика} {класс} класса\nгимназии-интерната имени\nБободжона Гафурова\nрайона Рудаки\n{фио}';
+/* Языки надписи: шаблон строк, школа «как в надписи», слово по полу и форма ФИО.
+ * {ученика} → слово по полу, {класс}, {школа} (многострочная), {год}, {фио} → ФИО в форме языка. */
+const LANGS = {
+  ru: {
+    label: 'Русский', template: '# Дневник\n{ученика} {класс} класса\n{школа}\n{фио}',
+    school: 'гимназии-интерната имени\nБободжона Гафурова\nрайона Рудаки',
+    wordM: 'ученика', wordF: 'ученицы', wordU: 'ученика/ученицы', nameForm: 'gen',
+  },
+  tg: {
+    label: 'Тоҷикӣ', template: '# Рӯзнома\n{ученика}и синфи {класс}\n{школа}\n{фио}',
+    school: 'гимназия-интернати ба номи\nБобоҷон Ғафуров\nноҳияи Рӯдакӣ',
+    wordM: 'хонанда', wordF: 'хонанда', wordU: 'хонанда', nameForm: 'nom',
+  },
+  en: {
+    label: 'English', template: '# School Diary\n{фио}\n{ученика} of Grade {класс}\n{школа}',
+    school: 'Bobojon Gafurov Boarding Gymnasium\nRudaki District',
+    wordM: 'Pupil', wordF: 'Pupil', wordU: 'Pupil', nameForm: 'lat',
+  },
+};
+const DEFAULT_TEMPLATE = LANGS.ru.template;
+const NAME_FORMS = [['gen', 'Родительный падеж (Абдуллоева Сухроба)'], ['nom', 'Именительный падеж (Абдуллоев Сухроб)'], ['lat', 'Латиницей (Abdulloev Sukhrob)']];
 
 const DEFAULTS = {
   cover: { fit: 'fill', anchorX: 0.5, anchorY: 0.5, zoom: 1, defaultDesign: true, eraseTitle: true, sharpen: true, sharpenAmount: 0.6 },
@@ -273,7 +301,8 @@ const DEFAULTS = {
   },
   frame: { shape: 'oval', cx: DESIGN.frame.cx, cy: DESIGN.frame.cy, wMm: 46, hMm: 61, radiusMm: 7, style: 'gold', ringMm: 1.8, shadow: true },
   text: {
-    template: DEFAULT_TEMPLATE, className: '2 «Г»', align: 'center',
+    lang: 'ru', template: DEFAULT_TEMPLATE, className: '2 «Г»', school: LANGS.ru.school, year: '', align: 'center',
+    wordM: LANGS.ru.wordM, wordF: LANGS.ru.wordF, wordU: LANGS.ru.wordU, nameForm: 'gen',
     titleFont: 'PT Serif', titleBold: true, titlePt: 32, titleColor: '#a3111f',
     bodyFont: 'PT Serif', bodyBold: false, bodyPt: 14, bodyColor: '#122a5c',
     nameFont: 'PT Serif', nameBold: true, namePt: 17, nameColor: '#0c1f4f',
@@ -282,7 +311,7 @@ const DEFAULTS = {
     marginRightMm: 9, marginBottomMm: 9,
   },
   guides: { spine: true, safe: false, safeMm: 5, labels: true },
-  export: { batchFormat: 'zip-png', jpegQuality: 0.95, scope: 'withPhoto', pattern: '{номер}_{фио_им}', foldMarks: false },
+  export: { batchFormat: 'zip-jpg', jpegQuality: 0.95, scope: 'ready', pattern: '{номер}_{фио_им}', foldMarks: false },
 };
 
 const FONTS = {
@@ -329,6 +358,15 @@ let uidCounter = 0;
 const uid = (p) => `${p}_${Date.now().toString(36)}${(uidCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+/* Уступить поток интерфейсу, не завися от видимости вкладки: rAF в фоновой вкладке не срабатывает,
+ * а пакетный экспорт должен идти, пока пользователь пьёт чай. */
+const yieldUI = () => new Promise((resolve) => {
+  const viaMsg = () => { const ch = new MessageChannel(); ch.port1.onmessage = () => resolve(); ch.port2.postMessage(0); };
+  if (document.hidden) { viaMsg(); return; }
+  let done = false; const fin = () => { if (done) return; done = true; document.removeEventListener('visibilitychange', onVis); resolve(); };
+  const onVis = () => { if (document.hidden) fin(); };
+  document.addEventListener('visibilitychange', onVis); requestAnimationFrame(fin);
+});
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const deepClone = (o) => JSON.parse(JSON.stringify(o));
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -350,15 +388,23 @@ const stripExt = (n) => String(n || '').replace(/\.[a-z0-9]{2,5}$/i, '');
 function hexToRgb(h) { const m = String(h).replace('#', '').match(/^([0-9a-f]{3}|[0-9a-f]{6})$/i); if (!m) return [0, 0, 0]; let s = m[1]; if (s.length === 3) s = s.split('').map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16)); }
 function rgba(hex, a) { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
 function mixHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',')})`; }
-function loadScript(url) {
-  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = url; s.async = true; s.onload = () => res(); s.onerror = () => rej(new Error('load ' + url)); document.head.appendChild(s); });
+/* Загрузка скрипта с таймаутом: «зависший» CDN (не отвечает, но и не ошибается) не должен блокировать экспорт */
+function loadScript(url, ms = 10000) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = url; s.async = true;
+    const t = setTimeout(() => { s.remove(); rej(new Error('timeout ' + url)); }, ms);
+    s.onload = () => { clearTimeout(t); res(); }; s.onerror = () => { clearTimeout(t); s.remove(); rej(new Error('load ' + url)); };
+    document.head.appendChild(s);
+  });
 }
 async function ensureLib(name) {
   const L = LIBS[name]; if (!L) return false;
   if (L.test()) return true;
   const failed = () => (window.__libFailed || []).includes(name);
-  if (name !== 'xlsx' && !failed()) { for (let i = 0; i < 40 && !L.test() && !failed(); i++) await sleep(100); if (L.test()) return true; }
-  for (const url of L.urls) { try { await loadScript(url); if (L.test()) return true; } catch (e) { /* пробуем следующее зеркало */ } }
+  const headTag = name !== 'xlsx';                    // первый адрес уже подключён тегом в <head>
+  if (headTag && !failed()) { for (let i = 0; i < 40 && !L.test() && !failed(); i++) await sleep(100); if (L.test()) return true; }
+  for (const url of headTag ? L.urls.slice(1) : L.urls) { try { await loadScript(url); if (L.test()) return true; } catch (e) { /* пробуем следующее зеркало */ } }
+  if (headTag && !L.test()) { try { await loadScript(L.urls[0]); } catch (e) { /* нет сети */ } }
   return !!L.test();
 }
 function saveBlob(blob, name) {
@@ -367,6 +413,7 @@ function saveBlob(blob, name) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
 }
 function canvasToBlob(c, type, q) { return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('Не удалось закодировать изображение'))), type, q)); }
+const localDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function pad2(n, total) { const s = String(n ?? '').trim(); if (!/^\d+$/.test(s)) return s; const w = String(total || 0).length >= 2 ? 2 : 1; return s.padStart(Math.max(w, 2), '0'); }
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };
 
@@ -431,15 +478,25 @@ function skeleton(token) {
   return s;
 }
 const tokensOf = (s) => normBase(s).split(/[^a-zа-я0-9]+/i).filter(Boolean);
+/* Кириллица (в т.ч. таджикские буквы) → латиница для надписей на английском */
+const LATIN = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'ғ': 'gh', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i', 'ӣ': 'i', 'й': 'y', 'к': 'k', 'қ': 'q', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ӯ': 'u', 'ў': 'u', 'ф': 'f', 'х': 'kh', 'ҳ': 'h', 'ц': 'ts', 'ч': 'ch', 'ҷ': 'j', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya' };
+function toLatin(s) {
+  return String(s || '').normalize('NFC').replace(/[\u0400-\u04FF]/g, (ch) => {
+    const lo = ch.toLowerCase(); const t = LATIN[lo]; if (t == null) return ch;
+    return ch === lo ? t : t.charAt(0).toUpperCase() + t.slice(1);
+  });
+}
 
 function parseGender(v) {
   const s = normBase(v).trim().replace(/[.\s]/g, '');
   if (!s) return '';
-  if (/^(м|m|муж|мал|boy|male|ю|пис|b$|мб|1$)/.test(s)) return 'M';
-  if (/^(ж|f|w|жен|дев|girl|female|д|дух|g$|2$)/.test(s)) return 'F';
+  if (/^(м|m|муж|мал|boy|male|ю|пис|п$|мард|b$|мб|1$)/.test(s)) return 'M';
+  if (/^(ж|f|w|жен|дев|girl|female|д|дух|зан|з$|g$|2$)/.test(s)) return 'F';
   return '';
 }
-const MALE_A = new Set(['мустафа', 'муса', 'никита', 'илья', 'лука', 'фома', 'кузьма', 'хамза', 'яхья', 'саша', 'миша', 'женя', 'ваня', 'дима', 'коля', 'петя', 'витя', 'лева', 'гоша', 'алеша', 'паша', 'сережа', 'тимоша', 'данила', 'савва', 'иса']);
+const MALE_A = new Set(['мустафа', 'муса', 'никита', 'илья', 'лука', 'фома', 'кузьма', 'хамза', 'яхья', 'яхе', 'саша', 'миша', 'женя', 'ваня', 'дима', 'коля', 'петя', 'витя', 'лева', 'гоша', 'алеша', 'паша', 'сережа', 'тимоша', 'данила', 'савва', 'иса', 'чура', 'мирзо', 'бобо', 'ато']);
+/* Женские таджикские имена на согласную (иначе эвристика «согласная → мальчик» ошибается) */
+const FEMALE_CONS = new Set(['нилуфар', 'шабнам', 'мехрангез', 'гулрух', 'гулрухсор', 'парвин', 'дилафруз', 'мижгон', 'садбарг', 'дилбар', 'ширин', 'нозанин', 'гулчехр', 'дилором', 'мохинур', 'паризод', 'гулшан', 'гулафшон', 'мехрубон', 'сарвиноз', 'дилноз', 'шахноз', 'гулноз', 'фарангис', 'гулбахор', 'бахор', 'нигор', 'гулнор', 'дилнур', 'мехрнур', 'нурафшон', 'рухшона', 'зебунисо', 'муборак', 'сурайё', 'сурайе', 'гулхумор', 'хумор', 'дурдона', 'мохру', 'мохпари', 'пари', 'гулдаста', 'шахло', 'ноила', 'зулфия', 'малохат', 'мухаббат', 'саодат', 'латофат', 'зиннат', 'рисолат', 'фарогат', 'гавхар', 'нодира', 'мехриннисо']);
 function guessGender(full) {
   const parts = String(full || '').trim().split(/\s+/).map(normBase).filter(Boolean);
   if (!parts.length) return '';
@@ -447,7 +504,8 @@ function guessGender(full) {
   if (pat) { if (/(вна|чна|кызы|кизи)$/.test(pat)) return 'F'; if (/(вич|ич|оглы|угли|угли)$/.test(pat)) return 'M'; }
   if (sur) { if (/(ова|ева|ина|ына|ская|цкая)$/.test(sur)) return 'F'; if (/(ов|ев|ин|ын|ский|цкий)$/.test(sur)) return 'M'; }
   if (first) {
-    if (MALE_A.has(first)) return 'M';
+    if (MALE_A.has(first) || /(улла|улло|ддин|иддин)$/.test(first)) return 'M';
+    if (FEMALE_CONS.has(first)) return 'F';
     if (/[ая]$/.test(first)) return 'F';
     if (/(ноз|нор|гул|бахор|нигор|гис|бону|ниса)$/.test(first)) return 'F';
     if (/[бвгджзклмнпрстфхцчшщй]$/.test(first)) return 'M';
@@ -464,18 +522,21 @@ function declineWord(word, gender, role) {
   const e = (re) => re.test(lw);
   const aEnd = () => (VEL_SIB.includes(lw.charAt(lw.length - 2)) ? 'и' : 'ы');
   const CONS = /[бвгджзклмнпрстфхцчшщҳқғҷ]$/;
+  if (role === 'sur' && e(/(ых|их)$/)) return word;           // Черных, Седых — не склоняются
   if (gender === 'M') {
     if (role === 'pat') return e(/ич$/) ? R(0, 'а') : word;
     if (role === 'sur') {
       if (e(/(зода|заде)$/)) return word;
       if (e(/(ов|ев|ёв|ин|ын)$/)) return R(0, 'а');
-      if (e(/(ский|цкий|ской|цкой|ый|ой)$/)) return R(2, 'ого');
+      if (e(/(ский|цкий|ской|цкой)$/) || (lw.length >= 5 && e(/(ый|ой)$/))) return R(2, 'ого'); // Толстой → Толстого, но Цой → Цоя
       if (e(/[йь]$/)) return R(1, 'я');
       if (e(/а$/)) return R(1, aEnd());
       if (e(/я$/)) return R(1, 'и');
       if (CONS.test(lw)) return R(0, 'а');
       return word;
     }
+    const FLEET = { 'лев': 'льва', 'павел': 'павла', 'пётр': 'петра', 'петр': 'петра' };
+    if (FLEET[lw]) { const r = FLEET[lw]; return up ? r.toUpperCase() : word.charAt(0) + r.slice(1); }
     if (e(/[йь]$/)) return R(1, 'я');
     if (e(/а$/)) return R(1, aEnd());
     if (e(/я$/)) return R(1, 'и');
@@ -503,12 +564,13 @@ function declineWord(word, gender, role) {
 function declineName(full, gender) {
   const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
   if (!parts.length || !gender) return '';
-  const roles = parts.length === 1 ? ['first'] : ['sur', 'first'];
+  const looksSurname = (w) => /(ов|ев|ёв|ин|ын|ова|ева|ёва|ина|ына|ский|цкий|ская|цкая|зода|заде|ӣ)$/i.test(w);
+  const roles = parts.length === 1 ? [looksSurname(parts[0]) ? 'sur' : 'first'] : ['sur', 'first'];
   return parts.map((w, i) => {
     const role = roles[i] || 'pat';
     const hs = w.split('-');
-    if (role === 'sur') return hs.map((x) => declineWord(x, gender, 'sur')).join('-');
-    hs[hs.length - 1] = declineWord(hs[hs.length - 1], gender, role);
+    if (role === 'sur' || (role === 'first' && gender === 'F')) return hs.map((x) => declineWord(x, gender, role)).join('-'); // Анна-Мария → Анны-Марии
+    hs[hs.length - 1] = declineWord(hs[hs.length - 1], gender, role);                       // Абдул-Карим → Абдул-Карима
     return hs.join('-');
   }).join(' ');
 }
@@ -516,10 +578,17 @@ function declineName(full, gender) {
 /* Разбор TSV/CSV (в т.ч. кавычки Excel, переносы внутри ячеек) */
 function parseDelimited(text) {
   text = String(text || '').replace(/^﻿/, '');
-  const firstLine = (text.split(/\r?\n/).find((l) => l.trim()) || '');
+  // разделитель — по первым строкам (над таблицей может стоять название без разделителей)
+  const head = text.split(/\r?\n/).filter((l) => l.trim()).slice(0, 10);
   let delim = null;
-  if (firstLine.includes('\t')) delim = '\t';
-  else { const sc = (firstLine.match(/;/g) || []).length, cc = (firstLine.match(/,/g) || []).length; if (sc || cc) delim = sc >= cc ? ';' : ','; }
+  const cnt = (re) => Math.max(0, ...head.map((l) => (l.match(re) || []).length));
+  if (head.some((l) => l.includes('\t'))) delim = '\t';
+  else {
+    const pc = cnt(/\|/g), sc = cnt(/;/g), cc = cnt(/,/g);
+    if (pc >= 2 && pc >= sc && pc >= cc) { // «Номер | ФИО | …» и таблицы Markdown
+      delim = '|'; text = text.split(/\r?\n/).map((l) => l.replace(/^\s*\|/, '').replace(/\|\s*$/, '')).join('\n');
+    } else if (sc || cc) delim = sc >= cc ? ';' : ',';
+  }
   const rows = []; let row = [], cell = '', q = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
@@ -532,54 +601,79 @@ function parseDelimited(text) {
     else cell += ch;
   }
   if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
-  return rows.map((r) => r.map((c) => c.replace(/\s+/g, ' ').trim())).filter((r) => r.some((c) => c));
+  return rows.map((r) => r.map((c) => c.replace(/\s+/g, ' ').trim()))
+    .filter((r) => r.some((c) => c) && !r.every((c) => !c || /^:?-{2,}:?$/.test(c)));
 }
-const ROLE_LABELS = { num: '№', nom: 'ФИО (им. п.)', gen: 'ФИО (род. п.)', gender: 'Пол', file: 'Имя файла', skip: '— пропустить —' };
+const ROLE_LABELS = { num: '№', nom: 'ФИО (им. п.)', gen: 'ФИО (род. п.)', sur: 'Фамилия', first: 'Имя', pat: 'Отчество', gender: 'Пол', file: 'Имя файла', class: 'Класс', skip: '— пропустить —' };
+/* Роль столбца по заголовку. \b в JS не считает кириллицу буквами — границы слова задаём явно. */
 function headerRole(h) {
-  const s = normBase(h).replace(/[_\-.]+/g, ' ').trim();
+  const s = normBase(h).replace(/[_\-.]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return null;
-  if (/(файл|file|фото|photo|image|img|изображ|снимок|картин)/.test(s)) return 'file';
-  // \b в JS не считает кириллицу буквами — границы слова задаём явно
   const W = '(?![а-яa-z0-9])', B = '(?<![а-яa-z0-9])';
-  if (new RegExp(`(родит|род п|${B}род${W}|genitive|кого)`).test(s)) return 'gen';
-  if (new RegExp(`^(пол|gender|sex|м/ж|м ж)${W}`).test(s) || new RegExp(`${B}пол${W}`).test(s)) return 'gender';
-  if (/^(№|n|no|nr|#|номер|п\/п|н\/п|порядк|num)/.test(s)) return 'num';
-  if (/(имен|им п|фио|ф и о|name|ученик|фамилия|ф\.и\.о)/.test(s)) return 'nom';
+  const has = (src) => new RegExp(src).test(s);
+  if (has(`^(имя файла|файл|file|фото|photo|image|img|изображ|снимок|картин)`) || has(`${B}(файл|file)${W}`)) return 'file';
+  if (has(`(родит|${B}род( п)?${W}|${B}р ?п${W}|genitive|${B}кого${W})`)) return 'gen';
+  if (has(`^(пол|gender|sex|м/ж|ж/м|м ж|ж м|ҷинс|чинс|жинс)${W}`) || has(`${B}пол${W}`) || has(`^(м/ж|ж/м)$`)) return 'gender';
+  if (has(`${B}(класс|class|синф|grade|группа|group)${W}`)) return 'class';
+  if (has(`^(№|n|no|nr|#|номер|п/п|н/п|порядк|num|number)(?![а-яa-z])`)) return 'num';
+  if (has(`${B}отчество${W}`) && !has(`${B}(фио|имя)${W}`)) return 'pat';
+  if (has(`^фамилия$`) || has(`^(surname|last name)$`)) return 'sur';
+  if (has(`^имя$`) || has(`^(first name|given name)$`)) return 'first';
+  if (has(`(${B}имен|${B}им ?п${W}|${B}фио${W}|${B}ф ?и ?о${W}|^name${W}|^full name|^ученик|^учащ|^фамилия|^список)`)) return 'nom';
   return null;
 }
 const isFileLike = (v) => /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif|tiff?)$/i.test(String(v || '').trim());
-function detectRoles(rows) {
-  const ncol = Math.max(0, ...rows.map((r) => r.length));
-  if (!rows.length || !ncol) return { roles: [], header: false };
-  const hdr = rows[0].map(headerRole);
-  const hdrCount = hdr.filter(Boolean).length;
-  const firstRowNumeric = rows[0].some((c) => /^\d{1,4}[.)]?$/.test(c));
-  if (hdrCount >= 2 || (hdrCount >= 1 && !firstRowNumeric && rows.length > 1 && !rows[0].some(isFileLike))) {
-    const roles = []; const used = new Set();
-    for (let j = 0; j < ncol; j++) {
-      let r = hdr[j] || null;
-      if (r === 'nom' && used.has('nom') && !used.has('gen')) r = 'gen';
-      if (r && used.has(r)) r = null;
-      if (r) used.add(r);
-      roles.push(r || 'skip');
-    }
-    return { roles, header: true };
+const isClassLike = (v) => /^\d{1,2}\s*[-–]?\s*[«"'“]?\s*[а-яёa-zҳқғҷӣӯ]\s*[»"'”]?$/i.test(String(v || '').trim());
+const isNumCell = (v) => /^\d{1,4}[.)]?$/.test(String(v || '').trim());
+/* Строка заголовков ищется в первых строках (над таблицей часто стоит название «Список 2 «Г» класса») */
+function findHeaderRow(rows) {
+  for (let i = 0; i < Math.min(5, rows.length - 1); i++) {
+    const r = rows[i];
+    if (r.some(isNumCell) || r.some(isFileLike)) continue; // строка с номером или файлом — это данные
+    const roles = r.map(headerRole); const n = roles.filter(Boolean).length;
+    const filled = r.filter((c) => c).length;
+    if (n >= 2 || (n >= 1 && filled === 1 && rows.length > 2 && r.length === Math.max(...rows.map((x) => x.length)))) return { index: i, roles };
   }
-  // без заголовка — по содержимому столбцов
+  return null;
+}
+function columnKinds(rows, ncol) {
   const kinds = [];
   for (let j = 0; j < ncol; j++) {
     const vals = rows.map((r) => (r[j] || '').trim()).filter(Boolean);
     if (!vals.length) { kinds.push('empty'); continue; }
-    if (vals.every((v) => /^\d{1,4}[.)]?$/.test(v))) kinds.push('num');
+    if (vals.every(isNumCell)) kinds.push('num');
     else if (vals.every((v) => v.length <= 8 && parseGender(v))) kinds.push('gender');
     else if (vals.filter(isFileLike).length >= Math.ceil(vals.length * 0.6)) kinds.push('file');
+    else if (vals.every(isClassLike)) kinds.push('class');
+    else if (vals.filter((v) => /\S+\s+\S+/.test(v)).length >= Math.ceil(vals.length * 0.6)) kinds.push('name');
     else kinds.push('text');
   }
-  const roles = kinds.map(() => 'skip'); const used = new Set();
-  kinds.forEach((k, j) => { if (k !== 'text' && k !== 'empty' && !used.has(k)) { roles[j] = k; used.add(k); } });
-  const textOrder = ['nom', 'gen', 'file'];
-  kinds.forEach((k, j) => { if (k === 'text') { const r = textOrder.find((x) => !used.has(x)); if (r) { roles[j] = r; used.add(r); } } });
-  return { roles, header: false };
+  return kinds;
+}
+function detectRoles(rows) {
+  const ncol = Math.max(0, ...rows.map((r) => r.length));
+  if (!rows.length || !ncol) return { roles: [], header: false, headerIndex: -1 };
+  const hdr = findHeaderRow(rows);
+  const dataRows = hdr ? rows.slice(hdr.index + 1) : rows;
+  const kinds = columnKinds(dataRows, ncol);
+  const roles = Array(ncol).fill('skip'); const used = new Set();
+  const take = (j, r) => { if (!r || used.has(r) || roles[j] !== 'skip') return false; roles[j] = r; used.add(r); return true; };
+  if (hdr) {
+    for (let j = 0; j < ncol; j++) {
+      let r = hdr.roles[j] || null;
+      if (r === 'nom' && used.has('nom') && !used.has('gen')) r = 'gen';
+      take(j, r);
+    }
+  }
+  // Столбцы без распознанного заголовка — по содержимому
+  kinds.forEach((k, j) => { if (['num', 'gender', 'file', 'class'].includes(k)) take(j, k); });
+  const nameSplit = used.has('sur') || used.has('first');
+  kinds.forEach((k, j) => {
+    if (roles[j] !== 'skip' || (hdr && hdr.roles[j] === null && !['name', 'text'].includes(k))) return;
+    if (k === 'name' && !nameSplit) { take(j, 'nom') || take(j, 'gen'); }
+    else if (k === 'text' && !hdr) { if (!used.has('nom') && !nameSplit) take(j, 'nom'); else if (!used.has('file')) take(j, 'file'); }
+  });
+  return { roles, header: !!hdr, headerIndex: hdr ? hdr.index : -1 };
 }
 function rowsToStudents(rows, roles, opts) {
   const at = (r, role) => { const j = roles.indexOf(role); return j >= 0 ? String(r[j] || '').trim() : ''; };
@@ -587,13 +681,14 @@ function rowsToStudents(rows, roles, opts) {
   for (const r of rows) {
     const st = newStudent({
       num: at(r, 'num').replace(/[.)]$/, ''),
-      nameNom: at(r, 'nom').replace(/\s+/g, ' '),
+      nameNom: (at(r, 'nom') || [at(r, 'sur'), at(r, 'first'), at(r, 'pat')].filter(Boolean).join(' ')).replace(/\s+/g, ' '),
       nameGen: at(r, 'gen').replace(/\s+/g, ' '),
       fileName: basename(at(r, 'file')),
+      className: at(r, 'class'),
     });
     if (!st.nameNom && !st.nameGen && !st.fileName) continue;
     let g = parseGender(at(r, 'gender'));
-    if (!g && opts.autoGender) { g = guessGender(st.nameNom || st.nameGen); st.genderGuessed = !!g; }
+    if (!g && opts.autoGender && st.nameNom) { g = guessGender(st.nameNom); st.genderGuessed = !!g; } // по род. падежу пол не угадываем
     st.gender = g;
     if (!st.nameGen && opts.autoDecline && st.nameNom && st.gender) { st.nameGen = declineName(st.nameNom, st.gender); st.genGuessed = true; }
     out.push(st);
@@ -610,12 +705,12 @@ const state = {
   currentId: null,
   settings: deepClone(DEFAULTS),
   cover: null,                // { orig, clean, tiny, w, h, ver, name, custom, profile }
-  ui: { tab: 'student', filter: 'all', search: '', view: 'spread', layoutMode: false, busy: false },
+  ui: { tab: 'student', filter: 'all', classFilter: '', search: '', view: 'spread', layoutMode: false, busy: false },
   demo: false,
 };
 const defaultCrop = () => ({ zoom: 1, x: 0, y: 0, rot: 0 });
 function newStudent(o = {}) {
-  return { id: uid('st'), num: '', nameNom: '', nameGen: '', gender: '', genderGuessed: false, genGuessed: false, fileName: '', photoId: null, photoManual: false, crop: defaultCrop(), ...o };
+  return { id: uid('st'), num: '', nameNom: '', nameGen: '', gender: '', genderGuessed: false, genGuessed: false, fileName: '', className: '', photoId: null, photoManual: false, photoRef: '', crop: defaultCrop(), cropKey: null, cropMemo: {}, cropTouched: false, ...o };
 }
 const current = () => state.students.find((s) => s.id === state.currentId) || null;
 const photoOf = (st) => (st && st.photoId ? state.photos.get(st.photoId) || null : null);
@@ -631,11 +726,13 @@ const DB = {
     if (this.failed || !window.indexedDB) return Promise.reject(new Error('IndexedDB недоступна'));
     return new Promise((res, rej) => {
       let r;
-      try { r = indexedDB.open('dnevnik-creator', 1); } catch (e) { this.failed = true; rej(e); return; }
+      const timer = setTimeout(() => { this.failed = true; rej(new Error('IndexedDB не отвечает')); }, 4000); // встречается в старом Safari
+      const ok = (v) => { clearTimeout(timer); res(v); }, bad = (e) => { clearTimeout(timer); rej(e); };
+      try { r = indexedDB.open('dnevnik-creator', 1); } catch (e) { this.failed = true; bad(e); return; }
       r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('photos')) d.createObjectStore('photos', { keyPath: 'id' }); if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv'); };
-      r.onsuccess = () => { this.db = r.result; res(this.db); };
-      r.onerror = () => { this.failed = true; rej(r.error); };
-      r.onblocked = () => rej(new Error('IndexedDB заблокирована'));
+      r.onsuccess = () => { this.db = r.result; ok(this.db); };
+      r.onerror = () => { this.failed = true; bad(r.error); };
+      r.onblocked = () => bad(new Error('IndexedDB заблокирована'));
     });
   },
   async run(store, mode, fn) {
@@ -646,7 +743,7 @@ const DB = {
       tx.oncomplete = () => res(out); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error || new Error('abort'));
     });
   },
-  putPhoto(p) { return this.run('photos', 'readwrite', (os) => os.put({ id: p.id, name: p.name, relPath: p.relPath, size: p.size, lastModified: p.lastModified, sig: p.sig, blob: p.blob, w: p.w, h: p.h })).catch((e) => { console.warn('IDB putPhoto', e); }); },
+  putPhoto(p) { return this.run('photos', 'readwrite', (os) => os.put({ id: p.id, seq: p.seq, name: p.name, relPath: p.relPath, size: p.size, lastModified: p.lastModified, sig: p.sig, blob: p.blob, w: p.w, h: p.h })).catch((e) => { console.warn('IDB putPhoto', e); }); },
   delPhoto(id) { return this.run('photos', 'readwrite', (os) => os.delete(id)).catch(() => {}); },
   clearPhotos() { return this.run('photos', 'readwrite', (os) => os.clear()).catch(() => {}); },
   allPhotos() { return this.run('photos', 'readonly', (os) => os.getAll()); },
@@ -667,14 +764,22 @@ const saveState = debounce(() => {
 }, 350);
 function setSaveLabel(t, bad) { const el = $('#saveState'); if (el) { el.textContent = t; el.style.color = bad ? '#b91c1c' : '#047857'; } }
 function loadSaved() { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+const finiteOr = (v, d) => (Number.isFinite(+v) ? +v : d);
+const cleanCrop = (c) => { const d = defaultCrop(); c = c && typeof c === 'object' ? c : {}; return { zoom: clamp(finiteOr(c.zoom, d.zoom), 0.2, 10), x: finiteOr(c.x, 0), y: finiteOr(c.y, 0), rot: clamp(finiteOr(c.rot, 0), -45, 45) }; };
+/* Данные из localStorage/файла проекта проверяются: id попадают в атрибуты и селекторы, числа — в value */
 function restoreStudents(list) {
+  const seen = new Set();
   return (Array.isArray(list) ? list : []).filter((s) => s && typeof s === 'object').map((s) => {
     const st = newStudent();
-    for (const k of Object.keys(st)) if (k in s && k !== 'crop') st[k] = s[k];
-    st.crop = { ...defaultCrop(), ...(s.crop || {}) };
-    for (const k of ['num', 'nameNom', 'nameGen', 'fileName']) st[k] = String(st[k] ?? '');
-    if (!['M', 'F'].includes(st.gender)) st.gender = '';
-    if (!st.id) st.id = uid('st');
+    for (const k of ['num', 'nameNom', 'nameGen', 'fileName', 'className', 'photoRef']) st[k] = String(s[k] ?? '').slice(0, 300);
+    st.gender = ['M', 'F'].includes(s.gender) ? s.gender : '';
+    for (const k of ['genderGuessed', 'genGuessed', 'photoManual', 'cropTouched']) st[k] = !!s[k];
+    st.id = typeof s.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(s.id) && !seen.has(s.id) ? s.id : uid('st'); seen.add(st.id);
+    st.photoId = typeof s.photoId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(s.photoId) ? s.photoId : null;
+    st.crop = cleanCrop(s.crop);
+    st.cropKey = typeof s.cropKey === 'string' ? s.cropKey : null;
+    st.cropMemo = {};
+    if (s.cropMemo && typeof s.cropMemo === 'object') for (const [k, v] of Object.entries(s.cropMemo).slice(-6)) st.cropMemo[String(k)] = { ...cleanCrop(v), touched: !!(v && v.touched) };
     return st;
   });
 }
@@ -777,9 +882,13 @@ function eraseTitle(canvas) {
     const gx = X0 + x + 0.5, gy = Y0 + y + 0.5, p = y * rw + x, i = p * 4, r = d[i], g = d[i + 1], b = d[i + 2];
     const pr = prot.some((q) => gx >= q[0] && gx < q[2] && gy >= q[1] && gy < q[3]); inProt[p] = pr ? 1 : 0;
     const strict = (r - g > 18 && b >= 0.8 * g) || (r > 60 && g < 0.3 * r && r - g > 40);
-    const loose = r - g > 22 && !(b > r + 40);
-    text[p] = (pr ? strict : loose) ? 1 : 0;
+    const leaf = g - b > 22 && g > 0.28 * r;  // оранжевые/бурые листья: синего заметно меньше зелёного (у малиновых букв b ≈ g)
+    const loose = r - g > 22 && !(b > r + 40) && !leaf;
+    text[p] = (pr ? strict : loose) ? 1 : 0; inProt[p] |= leaf ? 2 : 0;
   }
+  // «листовые» пиксели внутри букв (ореолы JPEG) отличаем от настоящего листа по плотности вокруг
+  const DR = Math.max(2, Math.round(3 * kx)), DT = Math.round(12 * kx * kx);
+  const leafDense = (x, y) => { let n = 0; for (let yy = Math.max(0, y - DR); yy <= Math.min(rh - 1, y + DR); yy++) for (let xx = Math.max(0, x - DR); xx <= Math.min(rw - 1, x + DR); xx++) n += (inProt[yy * rw + xx] & 2) >> 1; return n >= DT; };
   // квадратная дилатация маски (ловим ореолы JPEG вокруг букв)
   const R = Math.max(1, Math.round(2 * kx));
   const tmp = new Uint8Array(N), dil = new Uint8Array(N);
@@ -790,7 +899,7 @@ function eraseTitle(canvas) {
   for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) {
     const p = y * rw + x, i = p * 4, r = d[i], g = d[i + 1], b = d[i + 2];
     let rep = text[p] === 1;
-    if (!rep && dil[p]) { const blue = b > r + 40; const leaf = r > b + 60 && b < 0.6 * g && g >= 0.3 * r; rep = !blue && !(inProt[p] && leaf); }
+    if (!rep && dil[p]) { const blue = b > r + 40; const leaf = (inProt[p] & 2) && leafDense(x, y); rep = !blue && !leaf && !((inProt[p] & 1) && r > b + 60 && b < 0.6 * g); }
     if (!rep) continue;
     const rx = (X0 + x + 0.5) / kx - 0.5, ry = (Y0 + y + 0.5) / ky - 0.5;
     const a = 1 - (1 - cov(rx, G.cx, G.px)) * (1 - cov(ry, G.cy, G.py));
@@ -863,7 +972,7 @@ async function loadDefaultCover() {
 }
 async function setCustomCover(file, persist = true) {
   const { img, done } = await decodeBlob(file);
-  try { const c = downscaleToCanvas(img, 7000); await setCoverCanvas(c, { name: file.name || 'cover', custom: true }); }
+  try { const c = downscaleToCanvas(img, 7000); await setCoverCanvas(c, { name: file.name || 'cover', custom: true }); state.cover.blob = file; }
   finally { done(); }
   if (persist) DB.kvSet('cover', { blob: file, name: file.name || 'cover' });
 }
@@ -895,23 +1004,23 @@ function roundRectPath(p, x, y, w, h, r) {
   p.lineTo(x + r, y + h); p.arcTo(x, y + h, x, y + h - r, r); p.lineTo(x, y + r); p.arcTo(x, y, x + r, y, r); p.closePath();
 }
 /* Контур рамки. p — CanvasRenderingContext2D или Path2D */
-function addShape(p, r, shape, radius) {
+function addShape(p, r, shape, radius, d = 0) {
   if (shape === 'oval') { p.moveTo(r.x + r.w, r.y + r.h / 2); p.ellipse(r.x + r.w / 2, r.y + r.h / 2, Math.max(0.1, r.w / 2), Math.max(0.1, r.h / 2), 0, 0, Math.PI * 2); p.closePath(); }
   else if (shape === 'arch') {
-    const rr = Math.min(r.w / 2, r.h); const br = Math.min(radius * 0.6, r.w / 4, r.h / 4);
+    const rr = Math.min(r.w / 2, r.h); const br = Math.min(Math.max(0, radius - d) * 0.6 + d, r.w / 4, r.h / 4); // концентричные углы у обводки
     p.moveTo(r.x, r.y + rr); p.arc(r.x + r.w / 2, r.y + rr, r.w / 2, Math.PI, 0);
     p.lineTo(r.x + r.w, r.y + r.h - br); p.arcTo(r.x + r.w, r.y + r.h, r.x + r.w - br, r.y + r.h, br);
     p.lineTo(r.x + br, r.y + r.h); p.arcTo(r.x, r.y + r.h, r.x, r.y + r.h - br, br); p.closePath();
   } else roundRectPath(p, r.x, r.y, r.w, r.h, shape === 'rect' ? 0 : radius);
 }
-function framePath2D(d = 0) { const f = state.settings.frame; const p = new Path2D(); addShape(p, inflate(frameRect(), d), f.shape, f.radiusMm * MM + d); return p; }
+function framePath2D(d = 0) { const f = state.settings.frame; const p = new Path2D(); addShape(p, inflate(frameRect(), d), f.shape, f.radiusMm * MM + d, d); return p; }
 function backBandWidth(geo) {
   const b = state.settings.back;
   if (b.style === 'denim-full') return HALF;
   if (b.style === 'grid') return 0;
   if (b.bandMode === 'mirror' && state.settings.cover.defaultDesign) {
     const edge = geo.dx + DESIGN.denimEdge * geo.W0 * geo.sx; const w = edge - HALF;
-    if (w > 2 * MM) return Math.min(w, HALF);
+    return w > 2 * MM ? Math.min(w, HALF) : 0; // полосы на лицевой нет — и зеркалить нечего
   }
   return clamp(b.bandMm * MM, 0, HALF);
 }
@@ -921,18 +1030,23 @@ function backBandWidth(geo) {
  * ===================================================================== */
 let RS = 1; // текущий масштаб рендера (тени и blur в canvas не масштабируются трансформацией)
 let fontsVer = 0;
-const cache = { denim: null, static: null, exportStatic: null };
+const cache = { denim: null, denimBase: null, static: null, exportStatic: null };
 
-/* У самого корешка задняя джинса — зеркальное продолжение настоящей ткани с обложки (плавный переход в генерацию) */
-function blendMirroredStrip(img, geo, ps) {
+/* У самого корешка задняя джинса — продолжение настоящей ткани: берём ту часть cover.jpg, что ушла за край листа
+ * при обрезке. Это соседние столбцы того же изображения, поэтому стык на сгибе бесшовный, а саржа идёт в ту же сторону. */
+function blendHiddenStrip(img, geo, ps) {
   const S = state.cover.strip; const d = img.data, w = img.width, h = img.height;
   const kx = geo.W0 / REF_W;
-  const xEnd = 34 * kx, xFull = Math.max((HALF - geo.dx) / geo.sx, 26 * kx);
+  const xs = (HALF - geo.dx) / geo.sx;                  // столбец обложки на линии сгиба
+  const xMin = 8 * kx; let span = Math.min(xs, S.w - 1) - xMin; // левее 8 px у исходника светлая кромка
+  // если обложка прижата к корешку и скрытой части почти нет — зеркальное продолжение (тоже непрерывно на сгибе)
+  const mirror = span < 6 * kx; if (mirror) span = Math.max(0, 34 * kx - xs);
+  if (span < 2 * kx) return;
   for (let i = 0; i < w; i++) {
     const dist = HALF - (i + 0.5) * ps; if (dist < -ps) continue;
-    const xf = (HALF + Math.max(0, dist) - geo.dx) / geo.sx; if (xf >= xEnd || xf < 0) continue;
-    const wx = xf <= xFull ? 1 : 1 - smoothstep(xFull, xEnd, xf);
-    const sx = clamp(xf - 0.5, 0, S.w - 1.001), x0 = Math.floor(sx), tx = sx - x0;
+    const dd = Math.max(0, dist) / geo.sx; if (dd >= span) continue;
+    const wx = dd <= span * 0.55 ? 1 : 1 - smoothstep(span * 0.55, span, dd);
+    const sx = clamp((mirror ? xs + dd : xs - dd) - 0.5, 0, S.w - 1.001), x0 = Math.floor(sx), tx = sx - x0;
     for (let j = 0; j < h; j++) {
       const yf = ((j + 0.5) * ps - geo.dy) / geo.sy - 0.5; if (yf < 0 || yf >= S.h - 1) continue;
       const y0 = Math.floor(yf), ty = yf - y0, wt = wx * S.rowOk[y0]; if (wt <= 0) continue;
@@ -944,23 +1058,31 @@ function blendMirroredStrip(img, geo, ps) {
     }
   }
 }
+/* Базовая саржа дорогая и не зависит от сдвига обложки — кэшируется отдельно; тень у корешка и полоса — лёгкий проход */
+function getDenimBase(ps) {
+  const key = ps.toFixed(4);
+  if (cache.denimBase && cache.denimBase.key === key) return cache.denimBase;
+  const w = Math.ceil(HALF / ps) + 2, h = Math.ceil(SPREAD_H / ps) + 2;
+  const k = (FRONT.h / REF_H) / ps;              // та же «плотность» саржи, что у штатной обложки
+  cache.denimBase = { key, img: genDenim(w, h, k, 20240901, null), w, h };
+  return cache.denimBase;
+}
 function getDenim(geo) {
   const b = state.settings.back, cs = state.settings.cover;
   const ps = Math.max(1, geo.sy);                // размер «пикселя» генерации в пикселях печати
-  const key = [state.cover?.ver, ps.toFixed(4), geo.sx.toFixed(4), geo.dx.toFixed(2), b.spineShade, cs.defaultDesign].join('|');
+  const key = [state.cover?.ver, ps.toFixed(4), geo.sx.toFixed(4), geo.sy.toFixed(4), geo.dx.toFixed(2), geo.dy.toFixed(2), b.spineShade, cs.defaultDesign].join('|');
   if (cache.denim && cache.denim.key === key) return cache.denim;
-  const w = Math.ceil(HALF / ps) + 2, h = Math.ceil(SPREAD_H / ps) + 2;
-  const k = (FRONT.h / REF_H) / ps;              // та же «плотность» саржи, что у штатной обложки
-  const gain = new Float32Array(w).fill(1);
+  const base = getDenimBase(ps); const w = base.w, h = base.h;
+  const img = new ImageData(new Uint8ClampedArray(base.img.data), w, h); const d = img.data;
   if (b.spineShade) {
-    for (let j = 0; j < w; j++) {
-      const xp = (j + 0.5) * ps, dist = HALF - xp;
-      if (cs.defaultDesign && state.cover?.profile) gain[j] = profileGainAt((HALF + dist - geo.dx) / geo.sx);
-      else gain[j] = 0.55 + 0.45 * smoothstep(0, 30 * MM, dist);
+    for (let x = 0; x < w; x++) {
+      const dist = HALF - (x + 0.5) * ps;
+      const g = cs.defaultDesign && state.cover?.profile ? profileGainAt((HALF + dist - geo.dx) / geo.sx) : 0.55 + 0.45 * smoothstep(0, 30 * MM, dist);
+      if (g === 1) continue;
+      for (let y = 0; y < h; y++) { const o = (y * w + x) * 4; d[o] *= g; d[o + 1] *= g; d[o + 2] *= g; }
     }
   }
-  const img = genDenim(w, h, k, 20240901, gain);
-  if (cs.defaultDesign && state.cover?.strip) blendMirroredStrip(img, geo, ps);
+  if (cs.defaultDesign && state.cover?.strip) blendHiddenStrip(img, geo, ps);
   const c = createCanvas(w, h); c.getContext('2d').putImageData(img, 0, 0);
   cache.denim = { key, canvas: c, ps };
   return cache.denim;
@@ -1155,7 +1277,7 @@ function drawPhotoInRect(ctx, st, ph, img, r) {
 function drawPortrait(ctx, st, opts = {}) {
   const f = state.settings.frame; const r = frameRect(); const rad = f.radiusMm * MM;
   const ring = f.style === 'none' ? 0 : Math.max(0.2, f.ringMm) * MM;
-  const shape = (d) => { ctx.beginPath(); addShape(ctx, inflate(r, d), f.shape, rad + d); };
+  const shape = (d) => { ctx.beginPath(); addShape(ctx, inflate(r, d), f.shape, rad + d, d); };
   const outer = f.style === 'gold' ? ring + 0.7 * MM : ring;
   ctx.save();
   if (f.shadow) {
@@ -1188,32 +1310,50 @@ function drawPortrait(ctx, st, opts = {}) {
 }
 
 /* ---------- Надпись ---------- */
+/* Слово по полу и форма ФИО берутся из настроек языка надписи */
 function genderWord(st, cap) {
-  const w = st.gender === 'F' ? 'ученицы' : st.gender === 'M' ? 'ученика' : 'ученика/ученицы';
+  const t = state.settings.text;
+  const w = String((st.gender === 'F' ? t.wordF : st.gender === 'M' ? t.wordM : t.wordU) || '').trim();
   return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
+const genderMatters = () => String(state.settings.text.wordM || '').trim() !== String(state.settings.text.wordF || '').trim();
+const classOf = (st) => String((st && st.className) || '').trim() || String(state.settings.text.className || '').trim();
+function nameFor(st, form = state.settings.text.nameForm) {
+  if (form === 'nom') return st.nameNom || st.nameGen || '';
+  if (form === 'lat') return toLatin(st.nameNom || st.nameGen || '');
+  return st.nameGen || st.nameNom || '';
+}
+const TEMPLATE_KEYS = /\{\s*(ученика|ученик|фио_им|фио_род|фио_лат|фио|номер|класс|школа|год)\s*\}/giu;
 function fillTemplate(line, st) {
   const t = state.settings.text;
   return line
     .replace(/\[\s*ученика\s*\/\s*ученицы\s*\]/giu, (m) => genderWord(st, /^\[\s*У/u.test(m)))
-    .replace(/\[[^\]]*фамили[^\]]*\]/giu, () => st.nameGen || st.nameNom || '')
-    .replace(/\{\s*(ученика|ученик|фио_им|фио|номер|класс)\s*\}/giu, (m, key) => {
+    .replace(/\[[^\]]*фамили[^\]]*\]/giu, () => nameFor(st))
+    .replace(TEMPLATE_KEYS, (m, key) => {
       const k = key.toLowerCase(), cap = key.charAt(0) !== key.charAt(0).toLowerCase();
       if (k === 'ученика' || k === 'ученик') return genderWord(st, cap);
-      if (k === 'фио') return st.nameGen || st.nameNom || '';
-      if (k === 'фио_им') return st.nameNom || '';
+      if (k === 'фио') return nameFor(st);
+      if (k === 'фио_им') return nameFor(st, 'nom');
+      if (k === 'фио_род') return nameFor(st, 'gen');
+      if (k === 'фио_лат') return nameFor(st, 'lat');
       if (k === 'номер') return st.num || '';
-      if (k === 'класс') return t.className || '';
+      if (k === 'класс') return classOf(st);
+      if (k === 'школа') return String(t.school || '').replace(/\r/g, '');
+      if (k === 'год') return String(t.year || '').trim();
       return m;
     });
 }
 function buildLines(st) {
-  return String(state.settings.text.template || '').replace(/\r/g, '').split('\n').map((raw) => {
+  const out = [];
+  for (const raw of String(state.settings.text.template || '').replace(/\r/g, '').split('\n')) {
     let line = raw, style = 'body';
     if (/^\s*#\s*/.test(line)) { style = 'title'; line = line.replace(/^\s*#\s*/, ''); }
-    else if (/\{\s*фио(_им)?\s*\}|\[[^\]]*фамили[^\]]*\]/iu.test(line)) style = 'name';
-    return { style, text: fillTemplate(line, st).replace(/\s+/g, ' ').trim(), empty: !raw.trim() };
-  });
+    else if (/\{\s*фио(_им|_род|_лат)?\s*\}|\[[^\]]*фамили[^\]]*\]/iu.test(line)) style = 'name';
+    if (!raw.trim()) { out.push({ style, text: '', empty: true }); continue; }
+    // {школа} многострочная: каждая её строка — отдельная строка надписи того же стиля
+    for (const part of fillTemplate(line, st).split('\n')) out.push({ style, text: part.replace(/\s+/g, ' ').trim(), empty: false });
+  }
+  return out;
 }
 function styleFont(style, scale = 1) {
   const t = state.settings.text;
@@ -1379,19 +1519,22 @@ const PhotoCache = {
 };
 const isImageFile = (f) => /^image\//.test(f.type || '') || /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif|tiff?)$/i.test(f.name || '');
 const photoSig = (f) => `${f.name}|${f.size}|${f.lastModified}`;
-let thumbRunning = false;
-async function processThumbs() {
-  if (thumbRunning) return; thumbRunning = true;
+let thumbPromise = null;
+function processThumbs() { if (!thumbPromise) thumbPromise = runThumbs().finally(() => { thumbPromise = null; }); return thumbPromise; }
+async function runThumbs() {
   try {
+    let sawError = false;
     for (;;) {
       const cur = photoOf(current());
       let p = cur && cur.status === 'pending' ? cur : null;
       if (!p) for (const x of state.photos.values()) if (x.status === 'pending') { p = x; break; }
       if (!p) break;
       await makeThumb(p);
+      if (p.status === 'error') sawError = true;
       refreshStudentsWithPhoto(p.id);
     }
-  } finally { thumbRunning = false; }
+    if (sawError) autoMatch(); // нечитаемый файл уступает нормальному с тем же номером
+  } finally { /* очередь освобождается в processThumbs */ }
   renderList(); renderTab(true); schedulePreview();
 }
 async function makeThumb(p) {
@@ -1427,7 +1570,11 @@ function updateAvatar(st) {
   st.avatarUrl = c.toDataURL('image/jpeg', 0.8);
 }
 const updateAvatarsDebounced = debounce(() => { state.students.forEach(updateAvatar); renderList(); }, 250);
-const updateCurrentAvatarDebounced = debounce(() => { const s = current(); if (s) { updateAvatar(s); patchListItem(s); } }, 180);
+/* Аватары обновляются для тех учеников, чьё кадрирование менялось (а не для «текущего» на момент таймера) */
+const dirtyAvatars = new Set(); let lastCropUndo = null;
+const flushAvatars = () => { for (const id of dirtyAvatars) { const s = state.students.find((x) => x.id === id); if (s) { updateAvatar(s); patchListItem(s); } } dirtyAvatars.clear(); };
+const flushAvatarsDebounced = debounce(flushAvatars, 180);
+function markAvatarDirty(st) { dirtyAvatars.add(st.id); flushAvatarsDebounced(); }
 
 function photoInfo(p) {
   const base = stripExt(p.name);
@@ -1435,7 +1582,13 @@ function photoInfo(p) {
   const m = nb.match(/^(?:№\s*)?0*(\d{1,4})(?=$|[\s_.\-)(]+(?!\d))/);
   return { full: normBase(p.name).trim(), base: nb, num: m ? String(+m[1]) : null, sk: tokensOf(base).filter((t) => !/^\d+$/.test(t)).map(skeleton).filter((t) => t.length >= 2) };
 }
-function matchScore(st, info, surCount) {
+const photoKey = (p) => (p ? `${p.name}|${p.size}` : '');
+let photoSeq = 1; // порядок добавления: при равных баллах побеждает более новое фото
+function matchScore(st, info, surCount, p) {
+  if (st.photoRef && p) {                      // файл, который назначали вручную (например, в другом браузере)
+    if (photoKey(p) === st.photoRef) return 120;
+    if (normBase(p.name).trim() === normBase(st.photoRef.split('|')[0]).trim()) return 110;
+  }
   const fn = (st.fileName || '').trim();
   if (fn) {
     const nfn = normBase(basename(fn)).trim();
@@ -1453,36 +1606,66 @@ function matchScore(st, info, surCount) {
   }
   return 0;
 }
-const MATCH_TEXT = { 100: 'по имени файла', 95: 'по имени файла', 80: 'по номеру', 70: 'по номеру (файл из таблицы не найден)', 65: 'по ФИО в имени файла', 60: 'по ФИО в имени файла', 50: 'по фамилии в имени файла' };
+const MATCH_TEXT = { 120: 'назначено вручную', 110: 'назначено вручную', 100: 'по имени файла', 95: 'по имени файла', 80: 'по номеру', 70: 'по номеру (файл из таблицы не найден)', 65: 'по ФИО в имени файла', 60: 'по ФИО в имени файла', 50: 'по фамилии в имени файла' };
+/* Кадрирование привязано к файлу фото: при смене фото прежнее кадрирование запоминается,
+ * при возврате того же файла — восстанавливается; если фото временно нет, кадрирование не трогаем. */
+function setPhotoFor(st, p) {
+  if (!p) return;
+  const key = photoKey(p);
+  if (st.cropKey == null) { st.cropKey = key; return; }  // первое фото (или проект из прежней версии) — берём текущее кадрирование
+  if (st.cropKey === key) return;
+  st.cropMemo = st.cropMemo || {};
+  if (st.cropKey) st.cropMemo[st.cropKey] = { ...st.crop, touched: !!st.cropTouched };
+  const m = st.cropMemo[key];
+  st.crop = m ? { zoom: m.zoom, x: m.x, y: m.y, rot: m.rot } : defaultCrop(); st.cropTouched = !!(m && m.touched);
+  st.cropKey = key;
+  const keys = Object.keys(st.cropMemo); if (keys.length > 6) delete st.cropMemo[keys[0]];
+}
 function autoMatch() {
-  // ручные назначения сохраняются, остальные пересчитываются (каждое фото — одному ученику)
+  // ручное назначение хранит «ссылку» на файл; если фото нет в памяти, ученик участвует в подборе с приоритетом этого файла
   for (const s of state.students) if (s.photoManual && s.photoId && !state.photos.has(s.photoId)) s.photoId = null;
-  const manualUsed = new Set(state.students.filter((s) => s.photoManual && s.photoId).map((s) => s.photoId));
+  const isFixed = (s) => s.photoManual && (s.photoId || !s.photoRef);  // назначено вручную или намеренно убрано
+  const manualUsed = new Set(state.students.filter((s) => isFixed(s) && s.photoId).map((s) => s.photoId));
   const photos = [...state.photos.values()].filter((p) => !manualUsed.has(p.id));
   const infos = new Map(photos.map((p) => [p.id, photoInfo(p)]));
   const surCount = new Map();
   for (const s of state.students) { const t = tokensOf(s.nameNom || s.nameGen).map(skeleton)[0]; if (t) surCount.set(t, (surCount.get(t) || 0) + 1); }
-  const targets = state.students.filter((s) => !s.photoManual);
+  const targets = state.students.filter((s) => !isFixed(s));
   const pairs = [];
-  targets.forEach((s, si) => { for (const p of photos) { const sc = matchScore(s, infos.get(p.id), surCount); if (sc > 0) pairs.push({ s, p, sc, si }); } });
-  pairs.sort((a, b) => b.sc - a.sc || a.si - b.si);
+  targets.forEach((s, si) => {
+    for (const p of photos) {
+      const raw = matchScore(s, infos.get(p.id), surCount, p); if (raw <= 0) continue;
+      const sc = p.status === 'error' ? raw - 25 : raw; // нечитаемый файл (HEIC и т.п.) уступает нормальному с тем же номером
+      pairs.push({ s, p, sc, raw, si });
+    }
+  });
+  pairs.sort((a, b) => b.sc - a.sc || (b.p.seq || 0) - (a.p.seq || 0) || a.p.name.length - b.p.name.length || a.si - b.si); // «1.jpg» раньше «1 - копия.jpg»
   const prev = new Map(targets.map((s) => [s.id, s.photoId]));
   targets.forEach((s) => { s.photoId = null; s.matchInfo = ''; });
   const doneS = new Set(), doneP = new Set();
-  for (const { s, p, sc } of pairs) { if (doneS.has(s.id) || doneP.has(p.id)) continue; s.photoId = p.id; s.matchInfo = MATCH_TEXT[sc] || ''; doneS.add(s.id); doneP.add(p.id); }
-  for (const s of targets) if (prev.get(s.id) !== s.photoId) { s.crop = defaultCrop(); updateAvatar(s); }
-  for (const s of state.students) if (s.photoManual) s.matchInfo = s.photoId ? 'назначено вручную' : 'фото убрано вручную';
+  for (const { s, p, raw } of pairs) {
+    if (doneS.has(s.id) || doneP.has(p.id)) continue;
+    s.photoId = p.id; s.matchInfo = MATCH_TEXT[raw] || ''; doneS.add(s.id); doneP.add(p.id);
+    if (s.photoRef) s.photoManual = raw >= 110; // нашёлся файл, выбранный вручную, — снова «вручную»
+  }
+  for (const s of targets) if (prev.get(s.id) !== s.photoId) { setPhotoFor(s, photoOf(s)); updateAvatar(s); }
+  for (const s of state.students) {
+    if (!s.photoManual) continue;
+    if (s.photoId && isFixed(s)) s.matchInfo = 'назначено вручную';
+    else if (!s.photoId && !s.photoRef) s.matchInfo = 'фото убрано вручную';
+    else if (!s.photoId && s.photoRef) s.matchInfo = `ожидается файл «${s.photoRef.split('|')[0]}»`;
+  }
 }
 function unmatchedPhotos() { const used = new Set(state.students.map((s) => s.photoId).filter(Boolean)); return [...state.photos.values()].filter((p) => !used.has(p.id)); }
 async function addPhotoFiles(fileList, { assignTo = null, quiet = false } = {}) {
   const files = [...fileList].filter(isImageFile);
   if (!files.length) { toast('Среди выбранных файлов нет изображений', 'warn'); return []; }
   const bySig = new Map([...state.photos.values()].map((p) => [p.sig, p]));
-  const added = [];
+  const added = []; const batch = photoSeq++; // одна «партия» фото; при равных баллах побеждает более новая партия
   for (const f of files) {
     const sig = photoSig(f);
     if (bySig.has(sig)) { added.push(bySig.get(sig)); continue; }
-    const p = { id: uid('ph'), name: f.name, relPath: f.webkitRelativePath || f._relPath || '', size: f.size, lastModified: f.lastModified, sig, blob: f, status: 'pending', w: 0, h: 0, thumb: null, thumbUrl: '' };
+    const p = { id: uid('ph'), seq: batch, name: f.name, relPath: f.webkitRelativePath || f._relPath || '', size: f.size, lastModified: f.lastModified, sig, blob: f, status: 'pending', w: 0, h: 0, thumb: null, thumbUrl: '' };
     state.photos.set(p.id, p); bySig.set(sig, p); added.push(p);
     DB.putPhoto(p);
   }
@@ -1496,18 +1679,18 @@ async function addPhotoFiles(fileList, { assignTo = null, quiet = false } = {}) 
   }
   return added;
 }
-function assignPhoto(st, photoId) {
-  for (const s of state.students) if (s !== st && s.photoId === photoId) { s.photoId = null; if (s.photoManual) s.photoManual = false; }
-  if (st.photoId !== photoId) st.crop = defaultCrop();
-  st.photoId = photoId; st.photoManual = true;
-  autoMatch(); updateAvatar(st);
-  const p = state.photos.get(photoId); if (p && p.status === 'pending') processThumbs();
-  saveState(); renderAll();
+function clearAllPhotos() {
+  state.photos.clear(); PhotoCache.maps.prev.clear(); PhotoCache.maps.full.clear(); DB.clearPhotos();
+  for (const s of state.students) { s.photoId = null; s.avatarUrl = ''; if (s.photoManual && !s.photoRef) s.photoManual = false; }
 }
-function removePhotoFromPool(id) {
-  state.photos.delete(id); PhotoCache.drop(id); DB.delPhoto(id);
-  for (const s of state.students) if (s.photoId === id) { s.photoId = null; }
-  autoMatch(); saveState(); renderAll();
+function assignPhoto(st, photoId) {
+  for (const s of state.students) if (s !== st && s.photoId === photoId) { s.photoId = null; if (s.photoManual) { s.photoManual = false; s.photoRef = ''; } }
+  const p = state.photos.get(photoId);
+  st.photoId = photoId; st.photoManual = true; st.photoRef = photoKey(p);
+  setPhotoFor(st, p);
+  autoMatch(); updateAvatar(st);
+  if (p && p.status === 'pending') processThumbs();
+  saveState(); renderAll();
 }
 
 /* ---------- Предпечатная проверка ---------- */
@@ -1527,13 +1710,26 @@ function coversFrame(st, ph) {
 }
 let measureCtx = null;
 function textScaleFor(st) { if (!measureCtx) measureCtx = createCanvas(4, 4).getContext('2d'); return layoutText(measureCtx, st).minScale; }
+/* Что реально нужно текущему шаблону: родительный падеж и/или пол */
+function templateNeeds() {
+  const t = state.settings.text; const tpl = String(t.template || '');
+  const nameAny = /\{\s*фио\s*\}|\[[^\]]*фамили[^\]]*\]/iu.test(tpl);
+  return {
+    gen: /\{\s*фио_род\s*\}/iu.test(tpl) || (nameAny && t.nameForm === 'gen'),
+    gender: genderMatters() && /\{\s*ученик|\[\s*ученика/iu.test(tpl),
+  };
+}
 function preflight(st) {
-  const out = [];
+  const out = []; const need = templateNeeds(); const t = state.settings.text;
   if (!st.nameNom && !st.nameGen) out.push({ level: 'error', text: 'Не указано ФИО' });
-  if (!st.nameGen) out.push({ level: 'error', text: 'Нет ФИО в родительном падеже (для надписи)' });
-  else if (st.genGuessed) out.push({ level: 'info', text: 'Родительный падеж подобран автоматически — проверьте' });
-  if (!st.gender) out.push({ level: 'error', text: 'Не указан пол: «ученика» или «ученицы»?' });
-  else if (st.genderGuessed) out.push({ level: 'info', text: 'Пол определён автоматически по ФИО — проверьте' });
+  if (need.gen) {
+    if (!st.nameGen) out.push({ level: 'error', text: 'Нет ФИО в родительном падеже (для надписи)' });
+    else if (st.genGuessed) out.push({ level: 'warn', text: 'Родительный падеж подобран автоматически — проверьте и подтвердите' });
+  }
+  if (need.gender) {
+    if (!st.gender) out.push({ level: 'error', text: `Не указан пол: «${t.wordM}» или «${t.wordF}»?` });
+    else if (st.genderGuessed) out.push({ level: 'warn', text: 'Пол определён автоматически по ФИО — подтвердите щелчком' });
+  }
   const ph = photoOf(st);
   if (!ph) out.push({ level: 'error', text: st.fileName ? `Фото «${st.fileName}» не найдено среди загруженных` : 'Нет фото' });
   else if (ph.status === 'error') out.push({ level: 'error', text: `Фото «${ph.name}»: ${ph.err || 'ошибка'}` });
@@ -1543,7 +1739,14 @@ function preflight(st) {
     else if (dpi < 200) out.push({ level: 'info', text: `Разрешение фото ≈${dpi} dpi — допустимо` });
     if (!coversFrame(st, ph)) out.push({ level: 'warn', text: 'Фото не заполняет рамку целиком (видны поля)' });
   }
-  try { const sc = textScaleFor(st); if (sc < 0.8) out.push({ level: 'info', text: `Длинная строка надписи — шрифт уменьшен до ${Math.round(sc * 100)}%` }); } catch (e) { /* шрифты ещё грузятся */ }
+  try {
+    if (!measureCtx) measureCtx = createCanvas(4, 4).getContext('2d');
+    const L = layoutText(measureCtx, st); const P = L.plate, r = frameRect();
+    if (L.minScale < 0.8) out.push({ level: 'info', text: `Длинная строка надписи — шрифт уменьшен до ${Math.round(L.minScale * 100)}%` });
+    const outside = (q) => q.x < HALF || q.x + q.w > SPREAD_W || q.y < 0 || q.y + q.h > SPREAD_H;
+    if (outside(r)) out.push({ level: 'warn', text: 'Рамка фото заходит за линию сгиба или край листа' });
+    if (outside(P)) out.push({ level: 'warn', text: 'Надпись заходит за линию сгиба или край листа' });
+  } catch (e) { /* шрифты ещё грузятся */ }
   return out;
 }
 function statusOf(st) { const pf = preflight(st); return pf.some((i) => i.level === 'error') ? 'error' : pf.some((i) => i.level === 'warn') ? 'warn' : 'ok'; }
@@ -1601,13 +1804,13 @@ let hitCtx = null;
 function hitFrame(p, pad = 0) { if (!hitCtx) hitCtx = createCanvas(2, 2).getContext('2d'); return hitCtx.isPointInPath(framePath2D(pad), p.x, p.y); }
 function hitPlate(p) { const L = pv.lastLayout; if (!L) return false; const P = L.plate; return p.x >= P.x && p.x <= P.x + P.w && p.y >= P.y && p.y <= P.y + P.h; }
 function zoomAt(st, factor, p) {
-  const r = frameRect(); const z1 = st.crop.zoom, z2 = clamp(z1 * factor, 0.2, 10); const k = z2 / z1;
+  const r = frameRect(); const z1 = st.crop.zoom, z2 = clamp(z1 * factor, ZOOM_MIN, ZOOM_MAX); const k = z2 / z1;
   const Cx = r.cx + st.crop.x * r.w, Cy = r.cy + st.crop.y * r.h;
   const px = p ? p.x : r.cx, py = p ? p.y : r.cy;
   st.crop.zoom = z2; st.crop.x = (px + (Cx - px) * k - r.cx) / r.w; st.crop.y = (py + (Cy - py) * k - r.cy) / r.h;
   onCropChanged(st);
 }
-function onCropChanged(st) { schedulePreview(); syncCropInputs(); updateCurrentAvatarDebounced(); saveState(); renderPreflightBlockDebounced(); }
+function onCropChanged(st, { touched = true } = {}) { st.cropTouched = touched; schedulePreview(); syncCropInputs(); markAvatarDirty(st); saveState(); renderPreflightBlockDebounced(); }
 function bindPreview() {
   const c = pv.canvas;
   c.addEventListener('pointerdown', (e) => {
@@ -1642,8 +1845,17 @@ function bindPreview() {
     if (D) {
       const dx = p.x - D.start.x, dy = p.y - D.start.y;
       if (D.type === 'pan' && st) { const r = frameRect(); st.crop.x = D.x + dx / r.w; st.crop.y = D.y + dy / r.h; onCropChanged(st); }
-      else if (D.type === 'frame') { const g = coverGeo(); const f = state.settings.frame; f.cx = D.cx + dx / (g.W0 * g.sx); f.cy = D.cy + dy / (g.H0 * g.sy); onSettingsChanged('frame.cx'); }
-      else if (D.type === 'plate') { const t = state.settings.text; t.marginRightMm = +clamp(D.mr - dx / MM, -200, 200).toFixed(1); t.marginBottomMm = +clamp(D.mb - dy / MM, -200, 260).toFixed(1); onSettingsChanged('text.marginRightMm'); }
+      else if (D.type === 'frame') { // рамка не выходит за лицевую сторону (линия сгиба и края листа)
+        const g = coverGeo(); const f = state.settings.frame; const r = frameRect(g); const m = 2 * MM;
+        const cxP = clamp(r.cx + (D.cx - f.cx) * g.W0 * g.sx + dx, HALF + r.w / 2 + m, SPREAD_W - r.w / 2 - m);
+        const cyP = clamp(r.cy + (D.cy - f.cy) * g.H0 * g.sy + dy, r.h / 2 + m, SPREAD_H - r.h / 2 - m);
+        f.cx = (cxP - g.dx) / (g.W0 * g.sx); f.cy = (cyP - g.dy) / (g.H0 * g.sy); onSettingsChanged('frame.cx');
+      }
+      else if (D.type === 'plate') {
+        const t = state.settings.text; const ph = pv.lastLayout ? pv.lastLayout.plate.h / MM : 50;
+        t.marginRightMm = +clamp(D.mr - dx / MM, 0, FRONT.w / MM - t.plateWMm - 2).toFixed(1);
+        t.marginBottomMm = +clamp(D.mb - dy / MM, 0, SPREAD_H / MM - ph - 2).toFixed(1); onSettingsChanged('text.marginRightMm');
+      }
       return;
     }
     let cur = 'default';
@@ -1671,8 +1883,9 @@ function bindPreview() {
     if (!st || !photoOf(st) || !hitFrame(p)) return;
     e.preventDefault(); zoomAt(st, factor, p);
   }, { passive: false });
-  c.addEventListener('dblclick', (e) => { const st = current(); if (!st || state.ui.layoutMode) return; if (hitFrame(toPrint(e))) { st.crop = defaultCrop(); onCropChanged(st); } });
+  c.addEventListener('dblclick', (e) => { const st = current(); if (!st || state.ui.layoutMode) return; if (hitFrame(toPrint(e))) { st.crop = defaultCrop(); onCropChanged(st, { touched: false }); } });
   c.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // браузерные сочетания (Ctrl+0, Alt+↓) не трогаем
     const st = current(); if (!st || state.ui.layoutMode) return;
     const step = e.shiftKey ? 0.05 : 0.01; let handled = true;
     switch (e.key) {
@@ -1680,7 +1893,7 @@ function bindPreview() {
       case 'ArrowUp': st.crop.y -= step; break; case 'ArrowDown': st.crop.y += step; break;
       case '+': case '=': zoomAt(st, e.shiftKey ? 1.15 : 1.04); return;
       case '-': case '_': zoomAt(st, e.shiftKey ? 1 / 1.15 : 1 / 1.04); return;
-      case '0': st.crop = defaultCrop(); break;
+      case '0': st.crop = defaultCrop(); e.preventDefault(); onCropChanged(st, { touched: false }); return;
       default: handled = false;
     }
     if (handled) { e.preventDefault(); onCropChanged(st); }
@@ -1696,7 +1909,8 @@ function renderAll() { renderList(); renderTab(); renderToolbar(); schedulePrevi
 const renderListDebounced = debounce(() => renderList(), 60);
 function studentMatchesFilter(st) {
   const q = normBase(state.ui.search).trim();
-  if (q) { const hay = normBase([st.num, st.nameNom, st.nameGen, st.fileName, photoOf(st)?.name].join(' ')); if (!q.split(/\s+/).every((w) => hay.includes(w))) return false; }
+  if (q) { const hay = normBase([st.num, st.nameNom, st.nameGen, st.fileName, classOf(st), photoOf(st)?.name].join(' ')); if (!q.split(/\s+/).every((w) => hay.includes(w))) return false; }
+  if (state.ui.classFilter && classOf(st) !== state.ui.classFilter) return false;
   if (state.ui.filter === 'nophoto') return !photoOf(st) || photoOf(st).status === 'error';
   if (state.ui.filter === 'issues') return statusOf(st) !== 'ok';
   return true;
@@ -1717,17 +1931,18 @@ function statusIconHtml(st) {
 }
 function listItemHtml(st) {
   const g = st.gender === 'M' ? `<span class="badge badge-m ${st.genderGuessed ? 'guess' : ''}" title="${st.genderGuessed ? 'Мальчик (определено автоматически)' : 'Мальчик'}">М</span>` : st.gender === 'F' ? `<span class="badge badge-f ${st.genderGuessed ? 'guess' : ''}" title="${st.genderGuessed ? 'Девочка (определено автоматически)' : 'Девочка'}">Ж</span>` : '<span class="badge badge-u" title="Пол не указан">?</span>';
-  const ph = photoOf(st);
-  return `<li class="stu-item" data-id="${st.id}" aria-current="${st.id === state.currentId}" title="${esc(ph ? `Фото: ${ph.name}${st.matchInfo ? ' — ' + st.matchInfo : ''}` : st.fileName ? `Ожидается файл: ${st.fileName}` : 'Фото не назначено')}">
+  const ph = photoOf(st); const need = templateNeeds(); const insName = nameFor(st);
+  const cls = classList().length > 1 ? `<span class="badge shrink-0 bg-slate-100 text-slate-600" title="Класс">${esc(classOf(st) || '—')}</span>` : '';
+  return `<li class="stu-item" data-id="${esc(st.id)}" role="option" tabindex="${st.id === state.currentId ? 0 : -1}" aria-selected="${st.id === state.currentId}" aria-current="${st.id === state.currentId}" title="${esc(ph ? `Фото: ${ph.name}${st.matchInfo ? ' — ' + st.matchInfo : ''}` : st.fileName ? `Ожидается файл: ${st.fileName}` : 'Фото не назначено')}">
     <span class="w-6 shrink-0 text-right text-xs tabular-nums text-slate-400">${esc(st.num)}</span>
     ${avatarHtml(st)}
     <div class="min-w-0 flex-1 leading-tight">
       <div class="truncate text-sm font-semibold text-slate-800">${esc(st.nameNom || st.nameGen || '— без имени —')}</div>
-      <div class="truncate text-xs ${st.nameGen ? 'text-slate-500' : 'text-red-600'}">${esc(st.nameGen || 'нет род. падежа')}</div>
+      <div class="truncate text-xs ${need.gen && !st.nameGen ? 'text-red-600' : 'text-slate-500'}">${esc(need.gen && !st.nameGen ? 'нет род. падежа' : insName)}</div>
     </div>
-    ${g}${statusIconHtml(st)}
-    <span class="row-actions flex shrink-0 items-center gap-0.5">
-      <button class="btn btn-ghost btn-xs" data-row="photo" title="Загрузить фото для этого ученика">${icon('camera')}</button>
+    ${cls}${g}${statusIconHtml(st)}
+    <span class="row-actions ${!ph || ph.status === 'error' ? 'show' : ''} flex shrink-0 items-center gap-0.5">
+      <button class="btn btn-ghost btn-xs ${!ph || ph.status === 'error' ? 'text-amber-700' : ''}" data-row="photo" title="Загрузить фото для этого ученика" aria-label="Загрузить фото">${icon('camera')}</button>
     </span>
   </li>`;
 }
@@ -1739,22 +1954,44 @@ function renderList() {
   } else if (!items.length) {
     list.innerHTML = '<li class="p-4 text-center text-sm text-slate-500">Ничего не найдено</li>';
   } else list.innerHTML = items.map(listItemHtml).join('');
+  renderListCounts();
+  $$('#listFilter [data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === state.ui.filter)));
+  renderClassFilter(); renderUnmatched(); renderDemoNote();
+  const cur = list.querySelector('[aria-current="true"]');
+  if (cur && !listScrolledOnce.has(state.currentId)) { // прокручиваем только сам список, а не всю страницу (важно на телефоне)
+    const top = cur.offsetParent === list ? cur.offsetTop : cur.offsetTop - list.offsetTop, bottom = top + cur.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top - 4; else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight + 4;
+    listScrolledOnce.add(state.currentId);
+  }
+}
+const listScrolledOnce = new Set();
+function renderListCounts() {
   const total = state.students.length, withPh = state.students.filter((s) => photoOf(s) && photoOf(s).status !== 'error').length;
   const errs = state.students.filter((s) => statusOf(s) === 'error').length;
   $('#listCounts').innerHTML = total ? `${total} · фото ${withPh}/${total}${errs ? ` · <span class="text-red-600">проблем ${errs}</span>` : ''}` : '';
-  $$('#listFilter [data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === state.ui.filter)));
-  renderUnmatched(); renderDemoNote();
-  const cur = list.querySelector('[aria-current="true"]'); if (cur && !listScrolledOnce.has(state.currentId)) { cur.scrollIntoView({ block: 'nearest' }); listScrolledOnce.add(state.currentId); }
 }
-const listScrolledOnce = new Set();
-function patchListItem(st) { const el = $(`#studentList [data-id="${st.id}"]`); if (el) el.outerHTML = listItemHtml(st); }
+/* Несколько классов в одном списке: фильтр и значки появляются автоматически */
+function classList() { return [...new Set(state.students.map(classOf))].sort((a, b) => a.localeCompare(b, 'ru', { numeric: true })); }
+function renderClassFilter() {
+  const sel = $('#classFilter'); if (!sel) return;
+  const cl = classList();
+  if (state.ui.classFilter && !cl.includes(state.ui.classFilter)) state.ui.classFilter = '';
+  if (cl.length < 2) { sel.classList.add('hidden'); sel.innerHTML = ''; return; }
+  sel.classList.remove('hidden');
+  sel.innerHTML = `<option value="">Все классы (${cl.length})</option>` + cl.map((c) => `<option value="${esc(c)}" ${c === state.ui.classFilter ? 'selected' : ''}>${esc(c || 'без класса')} · ${state.students.filter((s) => classOf(s) === c).length}</option>`).join('');
+}
+function patchListItem(st) {
+  const el = [...$$('#studentList [data-id]')].find((x) => x.dataset.id === st.id);
+  if (el) { const had = document.activeElement === el; el.outerHTML = listItemHtml(st); if (had) [...$$('#studentList [data-id]')].find((x) => x.dataset.id === st.id)?.focus({ preventScroll: true }); }
+  renderListCounts(); renderUnmatched();
+}
 function renderUnmatched() {
   const box = $('#unmatchedBox'); const un = unmatchedPhotos();
   if (!un.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   box.classList.remove('hidden');
   box.innerHTML = `<div class="mb-2 flex items-center justify-between gap-2"><div class="text-xs font-bold text-amber-900">Фото без ученика: ${un.length}</div><button class="btn btn-ghost btn-xs text-amber-900" data-action="clear-unmatched" title="Убрать эти фото из памяти">${icon('trash', 'h-3.5 w-3.5')}Убрать</button></div>
     <p class="mb-2 text-[11px] leading-snug text-amber-800">Щёлкните по фото, чтобы назначить его текущему ученику, или перетащите на строку в списке.</p>
-    <div class="thin-scroll flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">${un.map((p) => `<button class="group relative" data-assign-photo="${p.id}" draggable="true" title="${esc(p.name)}${p.status === 'error' ? ' — ' + esc(p.err) : ''}">
+    <div class="thin-scroll flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">${un.map((p) => `<button class="group relative" data-assign-photo="${esc(p.id)}" draggable="true" title="${esc(p.name)}${p.status === 'error' ? ' — ' + esc(p.err) : ''}">
       ${p.thumbUrl ? `<img src="${p.thumbUrl}" class="h-14 w-11 rounded-md border border-amber-300 object-cover" alt="">` : `<div class="grid h-14 w-11 place-items-center rounded-md border border-amber-300 bg-white text-[9px] ${p.status === 'error' ? 'text-red-600' : 'text-slate-400'}">${p.status === 'error' ? 'ошибка' : '…'}</div>`}
       <span class="absolute inset-x-0 bottom-0 truncate rounded-b-md bg-black/60 px-0.5 text-[9px] text-white">${esc(p.name)}</span></button>`).join('')}</div>`;
 }
@@ -1769,16 +2006,18 @@ function renderToolbar() {
   $('#curTitle').innerHTML = st ? `<span class="text-slate-400">${idx + 1}/${state.students.length}</span> · ${esc(st.nameNom || st.nameGen || 'без имени')}` : '<span class="text-slate-400">Нет учеников — показан пример макета</span>';
   $$('#viewSeg [data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === state.ui.view)));
   $$('[data-guide]').forEach((i) => { i.checked = !!state.settings.guides[i.dataset.guide]; });
-  const lb = $('#layoutModeBtn'); lb.classList.toggle('btn-amber', state.ui.layoutMode);
+  const lb = $('#layoutModeBtn'); lb.classList.toggle('btn-amber', state.ui.layoutMode); lb.setAttribute('aria-pressed', String(state.ui.layoutMode));
   $('#hintBar').innerHTML = state.ui.layoutMode
     ? '<b class="text-amber-700">Режим макета (общий для всех учеников):</b> тяните рамку фото или плашку с надписью; колесо мыши над рамкой — размер рамки, над плашкой — её ширина. Точные значения — во вкладке «Макет».'
     : 'Фото: <b>тяните мышью</b> — сдвиг, <b>колесо</b> — масштаб, <b>двойной щелчок</b> — сброс, <kbd>←↑→↓</kbd> — точный сдвиг (<kbd>Shift</kbd> — быстрее), <kbd>+</kbd>/<kbd>−</kbd> — масштаб · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> — предыдущий/следующий ученик · перетащите фото на рамку, чтобы заменить.';
   $$('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === state.ui.tab)));
 }
-function selectStudent(id, { scroll = true } = {}) {
+function selectStudent(id, { scroll = true, focusRow = false } = {}) {
   if (!state.students.some((s) => s.id === id)) return;
+  flushAvatars();
   state.currentId = id; if (scroll) listScrolledOnce.delete(id);
   renderList(); renderToolbar(); if (state.ui.tab === 'student') renderTab(); schedulePreview(); saveState();
+  if (focusRow) $('#studentList [aria-current="true"]')?.focus({ preventScroll: true });
   const st = current(); const ph = photoOf(st);
   if (ph && ph.status === 'pending') processThumbs();
   prefetchNeighbors();
@@ -1787,10 +2026,10 @@ function prefetchNeighbors() {
   const i = state.students.findIndex((s) => s.id === state.currentId); if (i < 0) return;
   setTimeout(() => { for (const j of [i + 1, i - 1]) { const p = photoOf(state.students[j]); if (p && p.status !== 'error' && !PhotoCache.peek('prev', p.id)) PhotoCache.get('prev', p).catch(() => {}); } }, 350);
 }
-function stepStudent(d) {
+function stepStudent(d, focusRow = false) {
   const vis = state.students.filter(studentMatchesFilter); const arr = vis.length ? vis : state.students; if (!arr.length) return;
   let i = arr.findIndex((s) => s.id === state.currentId); i = i < 0 ? 0 : (i + d + arr.length) % arr.length;
-  selectStudent(arr[i].id);
+  selectStudent(arr[i].id, { focusRow });
 }
 
 /* ---------- Вкладка «Ученик» ---------- */
@@ -1813,29 +2052,53 @@ function renderStudentTab(body) {
   }
   const ph = photoOf(st);
   const crop = st.crop;
+  const t = state.settings.text; const need = templateNeeds();
   body.innerHTML = `
   <div class="space-y-3 pt-1">
     <div class="card space-y-3 p-3">
+      <div class="flex items-center justify-between gap-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] leading-snug text-indigo-900">
+        <span>Надпись: <b>${esc((LANGS[t.lang] || { label: 'свой шаблон' }).label)}</b> · ФИО ${esc({ gen: 'в родительном падеже', nom: 'в именительном падеже', lat: 'латиницей' }[t.nameForm] || '')}</span>
+        <button class="btn btn-ghost btn-xs text-indigo-700" data-act="goto-template" title="Школа, класс, язык надписи">${icon('layout', 'h-3.5 w-3.5')}шаблон</button>
+      </div>
       <div class="flex items-end gap-2">
         <label class="w-20 shrink-0"><span class="lbl">№</span><input class="inp" data-f="num" value="${esc(st.num)}" inputmode="numeric"></label>
         <label class="min-w-0 flex-1"><span class="lbl">ФИО (именительный)</span><input class="inp" data-f="nameNom" value="${esc(st.nameNom)}" placeholder="Фамилия Имя"></label>
       </div>
-      <label class="block"><span class="lbl flex items-center justify-between">ФИО для надписи (родительный падеж)
-        <button class="btn btn-ghost btn-xs normal-case tracking-normal text-indigo-700" data-act="auto-gen" title="Просклонять ФИО автоматически">${icon('wand', 'h-3.5 w-3.5')}авто</button></span>
-        <input class="inp ${st.genGuessed ? 'bg-amber-50' : ''}" data-f="nameGen" value="${esc(st.nameGen)}" placeholder="Фамилии Имени (кого?)"></label>
-      ${st.genGuessed ? '<p class="-mt-2 text-[11px] text-amber-700">Падеж подобран автоматически — проверьте, особенно для таджикских имён.</p>' : ''}
+      <div class="${need.gen || t.nameForm === 'gen' ? '' : 'opacity-60'}">
+        <div class="flex items-center justify-between gap-2"><label class="lbl" for="f_nameGen">ФИО в родительном падеже${need.gen ? ' (для надписи)' : ' (в этом шаблоне не нужно)'}</label>
+          <button class="btn btn-ghost btn-xs -mt-1 text-indigo-700" data-act="auto-gen" title="Просклонять ФИО автоматически">${icon('wand', 'h-3.5 w-3.5')}авто</button></div>
+        <input id="f_nameGen" class="inp ${st.genGuessed ? 'bg-amber-50' : ''}" data-f="nameGen" value="${esc(st.nameGen)}" placeholder="Фамилии Имени (кого?)"></div>
+      ${st.genGuessed && need.gen ? `<div class="-mt-2 flex items-center justify-between gap-2 text-[11px] text-amber-700"><span>Падеж подобран автоматически — проверьте, особенно для таджикских имён.</span><button class="btn btn-xs" data-act="confirm-gen">${icon('check', 'h-3.5 w-3.5')}верно</button></div>` : ''}
+      ${t.nameForm === 'lat' ? `<p class="-mt-1 rounded-lg bg-slate-50 px-2 py-1 text-[11px] text-slate-600">В надписи латиницей: <b>${esc(nameFor(st, 'lat'))}</b> (транслитерация из именительного падежа)</p>` : ''}
       <div>
         <span class="lbl">Пол</span>
         <div class="seg grid w-full grid-cols-2 ${st.gender === 'F' ? 'seg-pink' : 'seg-blue'}" id="genderSeg">
-          <button data-gender="M" aria-pressed="${st.gender === 'M'}">Мальчик · «ученика»</button>
-          <button data-gender="F" aria-pressed="${st.gender === 'F'}">Девочка · «ученицы»</button>
+          <button data-gender="M" aria-pressed="${st.gender === 'M'}">Мальчик · «${esc(t.wordM)}»</button>
+          <button data-gender="F" aria-pressed="${st.gender === 'F'}">Девочка · «${esc(t.wordF)}»</button>
         </div>
-        ${!st.gender ? '<p class="mt-1 text-[11px] font-semibold text-red-600">Пол не указан — в надписи будет «ученика/ученицы».</p>' : st.genderGuessed ? '<p class="mt-1 text-[11px] text-amber-700">Определено автоматически по ФИО — подтвердите щелчком.</p>' : ''}
+        ${!st.gender && need.gender ? `<p class="mt-1 text-[11px] font-semibold text-red-600">Пол не указан — в надписи будет «${esc(t.wordU)}».</p>` : st.genderGuessed && need.gender ? '<p class="mt-1 text-[11px] text-amber-700">Определено автоматически по ФИО — подтвердите щелчком.</p>' : ''}
       </div>
-      <label class="block"><span class="lbl">Имя файла фото</span><input class="inp" data-f="fileName" value="${esc(st.fileName)}" placeholder="например 1.jpg или ivanov.jpg"></label>
+      <div class="flex items-end gap-2">
+        <label class="w-28 shrink-0"><span class="lbl">Класс</span><input class="inp" data-f="className" value="${esc(st.className)}" placeholder="${esc(t.className || '2 «Г»')}" title="Оставьте пустым, чтобы взять класс из шаблона"></label>
+        <label class="min-w-0 flex-1"><span class="lbl">Имя файла фото</span><input class="inp" data-f="fileName" value="${esc(st.fileName)}" placeholder="например 1.jpg или ivanov.jpg"></label>
+      </div>
     </div>
 
-    <div class="card space-y-3 p-3">
+    ${photoCardHtml(st)}
+    ${cropCardHtml(st)}
+
+    <div class="card p-3" id="pfBlock"></div>
+
+    <div class="flex gap-2">
+      ${lastCropUndo ? `<button class="btn btn-sm flex-1" data-act="undo-dup">${icon('refresh', 'h-3.5 w-3.5')}Вернуть</button>` : `<button class="btn btn-sm flex-1" data-act="dup-crop" title="Применить это кадрирование (масштаб, сдвиг, поворот) к ученикам, у которых оно ещё не настроено вручную">${icon('refresh', 'h-3.5 w-3.5')}Кадр всем без правок</button>`}
+      <button class="btn btn-sm btn-danger flex-1" data-act="delete-student">${icon('trash', 'h-3.5 w-3.5')}Удалить ученика</button>
+    </div>
+  </div>`;
+  renderPreflightBlock();
+}
+function photoCardHtml(st) {
+  const ph = photoOf(st);
+  return `<div class="card space-y-3 p-3" id="photoCard">
       <div class="flex items-center justify-between"><h3 class="text-sm font-bold text-slate-900">Фото</h3>
         <span class="text-[11px] text-slate-500">${ph ? esc(st.matchInfo || '') : ''}</span></div>
       <div class="flex gap-3">
@@ -1850,43 +2113,57 @@ function renderStudentTab(body) {
           </div>
         </div>
       </div>
-      ${unmatchedPhotos().length ? `<label class="block"><span class="lbl">Или выбрать из нераспознанных</span><select class="inp inp-sm" data-act="assign-select"><option value="">— выбрать файл (${unmatchedPhotos().length}) —</option>${unmatchedPhotos().map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>` : ''}
-    </div>
-
-    <div class="card space-y-2.5 p-3 ${ph ? '' : 'pointer-events-none opacity-50'}" id="cropCard">
+      ${unmatchedPhotos().length ? `<label class="block"><span class="lbl">Или выбрать из нераспознанных</span><select class="inp inp-sm" data-act="assign-select"><option value="">— выбрать файл (${unmatchedPhotos().length}) —</option>${unmatchedPhotos().map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></label>` : ''}
+    </div>`;
+}
+/* Диапазоны ползунков сдвига зависят от масштаба и пропорций фото — совпадают с тем, что позволяет мышь */
+function cropLimits(st) {
+  const ph = photoOf(st); const r = frameRect(); const c = st.crop;
+  const ax = ph && ph.w && ph.h ? Math.max(1, (ph.w / ph.h) / (r.w / r.h)) : 1, ay = ph && ph.w && ph.h ? Math.max(1, (ph.h / ph.w) / (r.h / r.w)) : 1;
+  return { x: +Math.max(1, Math.abs(c.x) + 0.05, (c.zoom * ax - 1) / 2 + 0.25).toFixed(3), y: +Math.max(1, Math.abs(c.y) + 0.05, (c.zoom * ay - 1) / 2 + 0.25).toFixed(3) };
+}
+function cropCardHtml(st) {
+  const ph = photoOf(st); const crop = st.crop; const lim = cropLimits(st);
+  return `<div class="card space-y-2.5 p-3 ${ph ? '' : 'pointer-events-none opacity-50'}" id="cropCard">
       <div class="flex items-center justify-between"><h3 class="text-sm font-bold text-slate-900">Кадрирование</h3>
         <div class="flex gap-1">
           ${'FaceDetector' in window ? `<button class="btn btn-xs" data-act="face" title="Найти лицо и отцентровать">${icon('face', 'h-3.5 w-3.5')}Лицо</button>` : ''}
           <button class="btn btn-xs" data-act="crop-reset" title="Сбросить кадрирование">${icon('refresh', 'h-3.5 w-3.5')}Сброс</button>
         </div></div>
-      ${cropRow('zoom', 'Масштаб', 0.3, 5, 0.01, crop.zoom, (v) => `${Math.round(v * 100)}%`)}
-      ${cropRow('x', 'Смещение X', -1, 1, 0.001, crop.x, (v) => `${Math.round(v * 100)}%`)}
-      ${cropRow('y', 'Смещение Y', -1, 1, 0.001, crop.y, (v) => `${Math.round(v * 100)}%`)}
-      ${cropRow('rot', 'Поворот', -20, 20, 0.1, crop.rot, (v) => `${(+v).toFixed(1)}°`)}
+      ${cropRow('zoom', 'Масштаб', Math.log(ZOOM_MIN), Math.log(ZOOM_MAX), 0.001, Math.log(crop.zoom), crop.zoom)}
+      ${cropRow('x', 'Смещение X', -lim.x, lim.x, 0.001, crop.x, crop.x)}
+      ${cropRow('y', 'Смещение Y', -lim.y, lim.y, 0.001, crop.y, crop.y)}
+      ${cropRow('rot', 'Поворот', -20, 20, 0.1, crop.rot, crop.rot)}
       <p class="text-[11px] leading-snug text-slate-500">Можно двигать фото мышью прямо на развороте и масштабировать колёсиком.</p>
-    </div>
-
-    <div class="card p-3" id="pfBlock"></div>
-
-    <div class="flex gap-2">
-      <button class="btn btn-sm flex-1" data-act="dup-crop" title="Применить это кадрирование ко всем ученикам без ручных правок">${icon('refresh', 'h-3.5 w-3.5')}Масштаб всем</button>
-      <button class="btn btn-sm btn-danger flex-1" data-act="delete-student">${icon('trash', 'h-3.5 w-3.5')}Удалить ученика</button>
-    </div>
-  </div>`;
+    </div>`;
+}
+function refreshPhotoCards(st) {
+  if (state.ui.tab !== 'student' || !st || st !== current()) return;
+  const pc = $('#photoCard'), cc = $('#cropCard');
+  if (pc) pc.outerHTML = photoCardHtml(st);
+  if (cc) cc.outerHTML = cropCardHtml(st);
   renderPreflightBlock();
 }
-function cropRow(key, label, min, max, step, val, fmt) {
-  return `<div class="grid grid-cols-[88px_1fr_54px] items-center gap-2" data-crop-row="${key}">
-    <span class="text-xs font-semibold text-slate-600">${label}</span>
-    <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" data-crop="${key}">
-    <span class="text-right text-xs tabular-nums text-slate-600" data-crop-val="${key}">${fmt(val)}</span></div>`;
-}
+const ZOOM_MIN = 0.2, ZOOM_MAX = 10;
 const CROP_FMT = { zoom: (v) => `${Math.round(v * 100)}%`, x: (v) => `${Math.round(v * 100)}%`, y: (v) => `${Math.round(v * 100)}%`, rot: (v) => `${(+v).toFixed(1)}°` };
+/* Масштаб на ползунке — логарифмический (0,2…10×), чтобы мелкие значения тоже удобно настраивались */
+function cropRow(key, label, min, max, step, sliderVal, realVal) {
+  return `<div class="grid grid-cols-[88px_1fr_54px] items-center gap-2" data-crop-row="${key}">
+    <span class="text-xs font-semibold text-slate-600" id="lbl_crop_${key}">${label}</span>
+    <input type="range" min="${+min.toFixed(4)}" max="${+max.toFixed(4)}" step="${step}" value="${+(+sliderVal).toFixed(4)}" data-crop="${key}" aria-labelledby="lbl_crop_${key}">
+    <span class="text-right text-xs tabular-nums text-slate-600" data-crop-val="${key}">${CROP_FMT[key](realVal)}</span></div>`;
+}
+let activeRange = null; // ползунок, который сейчас тянут мышью, — его значение не перезаписываем
 function syncCropInputs() {
   const st = current(); if (!st || state.ui.tab !== 'student') return;
+  const lim = cropLimits(st);
   for (const k of ['zoom', 'x', 'y', 'rot']) {
     const i = $(`[data-crop="${k}"]`); const o = $(`[data-crop-val="${k}"]`);
-    if (i && document.activeElement !== i) i.value = st.crop[k]; if (o) o.textContent = CROP_FMT[k](st.crop[k]);
+    if (i && activeRange !== i) {
+      if (k === 'x' || k === 'y') { i.min = -lim[k]; i.max = lim[k]; }
+      i.value = k === 'zoom' ? Math.log(st.crop.zoom) : st.crop[k];
+    }
+    if (o) o.textContent = CROP_FMT[k](st.crop[k]);
   }
 }
 function renderPreflightBlock() {
@@ -1898,15 +2175,29 @@ function renderPreflightBlock() {
     : `<div class="flex items-center gap-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-800">${icon('check', 'h-3.5 w-3.5')}Разворот готов к печати</div>`);
 }
 const renderPreflightBlockDebounced = debounce(() => { renderPreflightBlock(); const s = current(); if (s) patchListItem(s); }, 250);
+/* Общая логика для панели «Ученик» и редактора таблицы: при смене ФИО пересчитываем
+ * автоматически подобранные пол и падеж (вручную введённые не трогаем) */
+function applyNameNom(st, v) {
+  st.nameNom = v;
+  if (st.genderGuessed || !st.gender) { const g = guessGender(v); st.gender = g; st.genderGuessed = !!g; }
+  if (st.genGuessed || !st.nameGen) { const d = declineName(v, st.gender); st.nameGen = d; st.genGuessed = !!d; }
+}
+/* Подбор фото после паузы в наборе: промежуточные значения («1» на пути к «15») не переназначают фото */
+const autoMatchSoon = debounce(() => {
+  const cur = current(); const before = cur && cur.photoId;
+  autoMatch(); renderList(); schedulePreview(); saveState();
+  if (cur && cur.photoId !== before) refreshPhotoCards(cur);
+  if ($('#mBody') && imp.tab === 'table') refreshTablePhotoCells();
+}, 450);
 function onStudentField(st, f, v) {
   if (f === 'nameNom') {
-    st.nameNom = v;
-    if (st.genderGuessed || !st.gender) { const g = guessGender(v); if (g) { st.gender = g; st.genderGuessed = true; } }
-    if (st.genGuessed || !st.nameGen) { const d = declineName(v, st.gender); st.nameGen = d; st.genGuessed = !!d; const gi = $('[data-f="nameGen"]'); if (gi && document.activeElement !== gi) gi.value = d; }
-    autoMatch();
+    applyNameNom(st, v);
+    const gi = $('[data-f="nameGen"]'); if (gi && document.activeElement !== gi) { gi.value = st.nameGen; gi.classList.toggle('bg-amber-50', st.genGuessed); }
+    autoMatchSoon();
   } else if (f === 'nameGen') { st.nameGen = v; st.genGuessed = false; }
-  else if (f === 'num') { st.num = v.trim(); autoMatch(); }
-  else if (f === 'fileName') { st.fileName = v.trim(); autoMatch(); }
+  else if (f === 'num') { st.num = v.trim(); autoMatchSoon(); }
+  else if (f === 'fileName') { st.fileName = v.trim(); autoMatchSoon(); }
+  else if (f === 'className') { st.className = v.trim(); renderListDebounced(); }
   patchListItem(st); renderToolbar(); schedulePreview(); saveState(); renderPreflightBlockDebounced();
 }
 function setGender(st, g) {
@@ -1917,8 +2208,19 @@ function setGender(st, g) {
 
 /* ---------- Вкладка «Макет» ---------- */
 const FONT_OPTS = Object.keys(FONTS).map((f) => [f, f]);
+const LANG_OPTS = Object.entries(LANGS).map(([k, L]) => [k, L.label]);
 const LAYOUT_SCHEMA = [
-  { title: 'Обложка (лицевая сторона)', open: true, items: [
+  { title: 'Шаблон: школа · класс · язык', items: [
+    { t: 'tpl-library' },
+    { k: 'text.lang', t: 'select', l: 'Язык надписи (готовый вариант текста)', o: LANG_OPTS },
+    { k: 'text.className', t: 'text', l: 'Класс по умолчанию — {класс}', ph: '2 «Г»', help: 'У каждого ученика можно указать свой класс (вкладка «Ученик» или столбец «Класс» в таблице) — так в одном списке помещаются несколько классов.' },
+    { k: 'text.school', t: 'textarea', rows: 3, l: 'Школа, как в надписи — {школа}', help: 'Каждая строка — отдельная строка надписи. Для русского текста — в родительном падеже: «средней школы №5 г. Душанбе».' },
+    { k: 'text.year', t: 'text', l: 'Учебный год — {год} (необязательно)', ph: '2026–2027 учебный год' },
+    { t: 'group', l: 'Слово по полу — {ученика}', items: [
+      { k: 'text.wordM', t: 'text', l: 'Мальчик', ph: 'ученика' }, { k: 'text.wordF', t: 'text', l: 'Девочка', ph: 'ученицы' }, { k: 'text.wordU', t: 'text', l: 'Пол не указан', ph: 'ученика/ученицы' } ] },
+    { k: 'text.nameForm', t: 'select', l: 'ФИО в надписи — {фио}', o: NAME_FORMS },
+  ] },
+  { title: 'Обложка (лицевая сторона)', items: [
     { t: 'cover-info' },
     { k: 'cover.fit', t: 'select', l: 'Посадка обложки', o: [['fill', 'Заполнить (обрезка краёв)'], ['stretch', 'Растянуть без обрезки'], ['contain', 'Вписать целиком']] },
     { k: 'cover.anchorX', t: 'range', l: 'Сдвиг по горизонтали', min: 0, max: 1, step: 0.005, f: (v) => `${Math.round(v * 100)}%` },
@@ -1926,8 +2228,8 @@ const LAYOUT_SCHEMA = [
     { k: 'cover.zoom', t: 'range', l: 'Масштаб обложки', min: 1, max: 1.6, step: 0.005, f: (v) => `${Math.round(v * 100)}%` },
     { k: 'cover.defaultDesign', t: 'check', l: 'Штатный дизайн cover.jpg (джинса, клетка, заголовок)' },
     { k: 'cover.eraseTitle', t: 'check', l: 'Стереть надпись «Дневник школьный 1‑4 класс»', show: (s) => s.cover.defaultDesign },
-    { k: 'cover.sharpen', t: 'check', l: 'Повышать резкость обложки при экспорте' },
-    { k: 'cover.sharpenAmount', t: 'range', l: 'Сила резкости', min: 0, max: 1.5, step: 0.05, f: (v) => (+v).toFixed(2), show: (s) => s.cover.sharpen },
+    { k: 'cover.sharpen', t: 'check', l: 'Повышать резкость обложки при экспорте (в предпросмотре не видно)' },
+    { k: 'cover.sharpenAmount', t: 'range', l: 'Сила резкости (только в файле)', min: 0, max: 1.5, step: 0.05, f: (v) => (+v).toFixed(2), show: (s) => s.cover.sharpen },
   ] },
   { title: 'Задняя обложка', items: [
     { k: 'back.style', t: 'select', l: 'Оформление', o: [['denim-grid', 'Джинса у корешка + синяя клетка'], ['denim-full', 'Сплошная джинса со строчкой'], ['grid', 'Тёмно-синий градиент + клетка']] },
@@ -1958,9 +2260,8 @@ const LAYOUT_SCHEMA = [
     { k: 'frame.shadow', t: 'check', l: 'Мягкая тень' },
     { t: 'buttons', items: [{ act: 'frame-reset', l: 'Вернуть рамку на тетрадный лист' }] },
   ] },
-  { title: 'Надпись', items: [
-    { k: 'text.className', t: 'text', l: 'Класс (подставляется в {класс})', ph: '2 «Г»' },
-    { k: 'text.template', t: 'textarea', l: 'Шаблон надписи', rows: 7, help: '<code># </code> в начале строки — заголовок. Подстановки: <code>{ученика}</code> → ученика/ученицы, <code>{класс}</code>, <code>{фио}</code> — ФИО в род. падеже, <code>{фио_им}</code>, <code>{номер}</code>.' },
+  { title: 'Надпись: текст и оформление', items: [
+    { k: 'text.template', t: 'textarea', l: 'Шаблон надписи', rows: 6, help: '<code># </code> в начале строки — заголовок. Подстановки: <code>{ученика}</code> — слово по полу, <code>{класс}</code>, <code>{школа}</code>, <code>{год}</code>, <code>{фио}</code> — ФИО в выбранной форме, а также <code>{фио_им}</code>, <code>{фио_род}</code>, <code>{фио_лат}</code>, <code>{номер}</code>.' },
     { k: 'text.align', t: 'select', l: 'Выравнивание', o: [['center', 'По центру'], ['left', 'По левому краю'], ['right', 'По правому краю']] },
     { t: 'group', l: 'Заголовок «Дневник»', items: [
       { k: 'text.titleFont', t: 'select', l: 'Шрифт', o: FONT_OPTS }, { k: 'text.titlePt', t: 'range', l: 'Кегль', min: 12, max: 72, step: 0.5, u: 'pt' },
@@ -1990,13 +2291,26 @@ const LAYOUT_SCHEMA = [
   ] },
   { title: 'Сброс', items: [{ t: 'buttons', items: [{ act: 'layout-reset', l: 'Сбросить все настройки макета', danger: true }] }] },
 ];
-const openSections = new Set([LAYOUT_SCHEMA[0].title]);
+const openSections = new Set([LAYOUT_SCHEMA[0].title, LAYOUT_SCHEMA[1].title]);
 function fmtVal(it, v) { return it.f ? it.f(+v) : `${(+v).toFixed(it.step < 0.1 ? 2 : 1).replace(/\.0+$/, '')}${it.u ? ' ' + it.u : ''}`; }
 function controlHtml(it) {
   const s = state.settings;
   if (it.show && !it.show(s)) return '';
   if (it.t === 'group') return `<div class="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5"><div class="mb-2 text-xs font-bold text-slate-700">${esc(it.l)}</div><div class="space-y-2">${it.items.map(controlHtml).join('')}</div></div>`;
   if (it.t === 'buttons') return `<div class="flex flex-wrap gap-2">${it.items.map((b) => `<button class="btn btn-sm ${b.danger ? 'btn-danger' : ''}" data-act="${b.act}">${esc(b.l)}</button>`).join('')}</div>`;
+  if (it.t === 'tpl-library') {
+    const list = loadTemplates();
+    return `<div class="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50/60 p-2.5">
+      <div class="flex items-center justify-between"><span class="text-xs font-bold text-indigo-900">Мои шаблоны</span><span class="text-[11px] text-indigo-700">${list.length ? `${list.length} сохр.` : 'пока нет'}</span></div>
+      ${list.length ? `<div class="flex gap-1.5"><select class="inp inp-sm min-w-0 flex-1" id="tplSelect">${list.map((x) => `<option value="${esc(x.id)}" ${x.id === lastTplId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><button class="btn btn-sm btn-primary" data-act="tpl-apply">Применить</button></div>` : ''}
+      <div class="flex flex-wrap gap-1.5">
+        <button class="btn btn-xs" data-act="tpl-save">${icon('save', 'h-3.5 w-3.5')}Сохранить текущий…</button>
+        ${list.length ? `<button class="btn btn-xs" data-act="tpl-export">${icon('download', 'h-3.5 w-3.5')}В файл</button><button class="btn btn-xs btn-danger" data-act="tpl-delete">${icon('trash', 'h-3.5 w-3.5')}Удалить</button>` : ''}
+        <button class="btn btn-xs" data-act="tpl-import">${icon('upload', 'h-3.5 w-3.5')}Из файла…</button>
+      </div>
+      <p class="text-[11px] leading-snug text-indigo-900/80">Шаблон запоминает школу, класс, язык и текст надписи, её оформление, рамку, заднюю обложку и обложку (в том числе загруженную). Шаблоны общие для всех проектов в этом браузере; файл шаблона (.json) можно передать на другой компьютер.</p>
+    </div>`;
+  }
   if (it.t === 'cover-info') {
     const c = state.cover; if (!c) return '';
     const geo = coverGeo(); const dpi = Math.round(DPI / geo.sx);
@@ -2009,13 +2323,22 @@ function controlHtml(it) {
   if (it.t === 'check') return `<label class="chk flex"><input type="checkbox" data-k="${it.k}" ${v ? 'checked' : ''}><span>${esc(it.l)}</span></label>`;
   if (it.t === 'select') return `<label class="block"><span class="lbl">${esc(it.l)}</span><select class="inp inp-sm" data-k="${it.k}">${it.o.map(([ov, ol]) => `<option value="${esc(ov)}" ${String(ov) === String(v) ? 'selected' : ''}>${esc(ol)}</option>`).join('')}</select></label>`;
   if (it.t === 'color') return `<label class="flex items-center justify-between gap-2"><span class="text-xs font-semibold text-slate-600">${esc(it.l)}</span><input type="color" data-k="${it.k}" value="${esc(v)}"></label>`;
-  if (it.t === 'text') return `<label class="block"><span class="lbl">${esc(it.l)}</span><input class="inp inp-sm" data-k="${it.k}" value="${esc(v)}" placeholder="${esc(it.ph || '')}"></label>`;
+  if (it.t === 'text') return `<label class="block"><span class="lbl">${esc(it.l)}</span><input class="inp inp-sm" data-k="${it.k}" value="${esc(v)}" placeholder="${esc(it.ph || '')}">${it.help ? `<span class="mt-1 block text-[11px] leading-snug text-slate-500">${it.help}</span>` : ''}</label>`;
   if (it.t === 'textarea') return `<label class="block"><span class="lbl">${esc(it.l)}</span><textarea class="inp inp-sm font-mono" rows="${it.rows || 2}" data-k="${it.k}" placeholder="${esc(it.ph || '')}" spellcheck="false">${esc(v)}</textarea>${it.help ? `<span class="mt-1 block text-[11px] leading-snug text-slate-500">${it.help}</span>` : ''}</label>`;
-  if (it.t === 'range') return `<div class="grid grid-cols-[1fr_auto] items-center gap-x-2" id="${id}"><span class="text-xs font-semibold text-slate-600">${esc(it.l)}</span><span class="text-xs tabular-nums text-slate-600" data-kv="${it.k}">${fmtVal(it, v)}</span><input class="col-span-2" type="range" min="${it.min}" max="${it.max}" step="${it.step}" value="${v}" data-k="${it.k}"></div>`;
+  if (it.t === 'range') return `<div class="grid grid-cols-[1fr_auto] items-center gap-x-2" id="${id}"><span class="text-xs font-semibold text-slate-600">${esc(it.l)}</span><span class="text-xs tabular-nums text-slate-600" data-kv="${it.k}">${fmtVal(it, v)}</span><input class="col-span-2" type="range" min="${it.min}" max="${it.max}" step="${it.step}" value="${v}" data-k="${it.k}" aria-label="${esc(it.l)}"></div>`;
   return '';
 }
 function findSchemaItem(k) { const walk = (arr) => { for (const it of arr) { if (it.k === k) return it; if (it.items) { const r = walk(it.items); if (r) return r; } } return null; }; return walk(LAYOUT_SCHEMA); }
+/* Какие поля макета сейчас видимы (для перерисовки, когда ввод текста открывает зависимые поля) */
+function visSig() { const out = []; const walk = (arr) => { for (const it of arr) { if (it.show) out.push((it.k || it.l) + ':' + (it.show(state.settings) ? 1 : 0)); if (it.items) walk(it.items); } }; walk(LAYOUT_SCHEMA); return out.join('|'); }
+let lastVisSig = '';
+function rerenderKeepingFocus() {
+  const a = document.activeElement; const k = a && a.dataset && a.dataset.k; const ss = a && a.selectionStart, se = a && a.selectionEnd;
+  renderTab();
+  if (k) { const n = $(`#tabBody [data-k="${k}"]`); if (n) { n.focus({ preventScroll: true }); try { if (ss != null) n.setSelectionRange(ss, se); } catch (e) { /* не текстовое поле */ } } }
+}
 function renderLayoutTab(body) {
+  lastVisSig = visSig();
   body.innerHTML = `<div class="space-y-2 pt-1">${LAYOUT_SCHEMA.map((sec) => `<details class="sec card overflow-hidden" data-sec="${esc(sec.title)}" ${openSections.has(sec.title) ? 'open' : ''}>
     <summary class="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-slate-900 hover:bg-slate-50"><span class="chev text-slate-400">${icon('chevR', 'h-3.5 w-3.5')}</span>${esc(sec.title)}</summary>
     <div class="space-y-2.5 border-t border-slate-100 px-3 pb-3 pt-2.5">${sec.items.map(controlHtml).join('')}</div></details>`).join('')}
@@ -2032,15 +2355,99 @@ function onSettingsChanged(path) {
   const [top] = path.split('.');
   if (path === 'cover.defaultDesign' || path === 'cover.eraseTitle') processCover();
   if (top === 'frame') updateAvatarsDebounced();
+  if (top === 'text') renderListDebounced();
   if (top === 'export' && path !== 'export.foldMarks') { /* только экспорт */ }
   schedulePreview(); saveState(); renderPreflightBlockDebounced();
 }
 
+/* ---------- Шаблоны: язык надписи и библиотека «Мои шаблоны» ---------- */
+const TPL_KEY = 'dnevnik-creator:templates';
+const TPL_PARTS = ['cover', 'back', 'frame', 'text'];
+let lastTplId = null;
+function loadTemplates() {
+  try { const a = JSON.parse(localStorage.getItem(TPL_KEY) || '[]'); return Array.isArray(a) ? a.filter((x) => x && x.id && x.name && x.settings) : []; } catch (e) { return []; }
+}
+function storeTemplates(list) {
+  try { localStorage.setItem(TPL_KEY, JSON.stringify(list)); return true; } catch (e) { toast('Не удалось сохранить шаблон: в браузере мало места', 'error'); return false; }
+}
+function afterTemplateChange() {
+  cache.exportStatic = null; processCover(); updateAvatarsDebounced(); renderAll(); saveState();
+  ensureFonts(exportTextOf(state.students.slice(0, 40)));
+}
+/* Готовый текст на выбранном языке: шаблон строк, школа, слова по полу и форма ФИО. Класс и оформление не трогаем. */
+function applyLanguage(lang) {
+  const L = LANGS[lang]; const t = state.settings.text; if (!L) return;
+  if (lang === t.lang && t.template === L.template) return;
+  if (!confirm(`Заменить текст надписи, название школы и слова по полу на готовый вариант «${L.label}»?\n\nКласс, шрифты и оформление сохранятся. Название школы потом поправьте под свою школу.`)) { renderTab(); return; }
+  Object.assign(t, { lang, template: L.template, school: L.school, wordM: L.wordM, wordF: L.wordF, wordU: L.wordU, nameForm: L.nameForm });
+  afterTemplateChange();
+  toast(`Язык надписи: ${L.label}`, 'ok');
+}
+function blobToDataURL(b) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); }); }
+async function currentCoverBlob() {
+  if (!state.cover || !state.cover.custom) return null;
+  if (state.cover.blob) return state.cover.blob;
+  try { return await canvasToBlob(state.cover.orig, 'image/jpeg', 0.95); } catch (e) { return null; }
+}
+async function saveCurrentAsTemplate() {
+  const t = state.settings.text;
+  const def = [String(t.school || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 2).join(' '), t.className, (LANGS[t.lang] || {}).label].filter(Boolean).join(' · ');
+  const name = (prompt('Название шаблона (например: «Школа №5 · 3 «А» · русский»):', def) || '').trim(); if (!name) return;
+  const list = loadTemplates(); const same = list.find((x) => x.name === name);
+  if (same && !confirm(`Шаблон «${name}» уже есть. Заменить его?`)) return;
+  const id = same ? same.id : uid('tpl');
+  const settings = {}; for (const k of TPL_PARTS) settings[k] = deepClone(state.settings[k]);
+  const blob = await currentCoverBlob();
+  const tpl = { id, name, savedAt: new Date().toISOString(), settings, cover: blob ? { name: state.cover.name } : null };
+  if (blob) await DB.kvSet('tplcover:' + id, { blob, name: state.cover.name }); else DB.kvDel('tplcover:' + id);
+  const next = same ? list.map((x) => (x.id === id ? tpl : x)) : [...list, tpl];
+  if (storeTemplates(next)) { lastTplId = id; renderTab(); toast(`Шаблон «${name}» сохранён`, 'ok'); }
+}
+async function applyTemplate(tpl, { coverDataUrl } = {}) {
+  const fresh = deepClone(DEFAULTS);
+  for (const k of TPL_PARTS) fresh[k] = deepMerge(fresh[k], (tpl.settings || {})[k] || {});
+  fresh.guides = state.settings.guides; fresh.export = state.settings.export;
+  state.settings = fresh; lastTplId = tpl.id;
+  try {
+    if (tpl.cover) {
+      let blob = null;
+      if (coverDataUrl) blob = await (await fetch(coverDataUrl)).blob();
+      else { const rec = await DB.kvGet('tplcover:' + tpl.id).catch(() => null); blob = rec && rec.blob; }
+      if (blob) await setCustomCover(new File([blob], tpl.cover.name || 'cover.jpg', { type: blob.type || 'image/jpeg' }));
+      else toast('Обложка этого шаблона не найдена в браузере — оставлена текущая', 'warn', 6000);
+    } else if (state.cover && state.cover.custom) { DB.kvDel('cover'); await loadDefaultCover(); }
+  } catch (e) { toast('Не удалось восстановить обложку шаблона', 'warn'); }
+  afterTemplateChange();
+  toast(`Применён шаблон «${tpl.name}»`, 'ok');
+}
+async function exportTemplate(tpl) {
+  let cover = null;
+  if (tpl.cover) { const rec = await DB.kvGet('tplcover:' + tpl.id).catch(() => null); if (rec && rec.blob) cover = { name: tpl.cover.name, dataUrl: await blobToDataURL(rec.blob) }; }
+  const data = { app: 'dnevnik-creator-template', v: 1, name: tpl.name, savedAt: tpl.savedAt, settings: tpl.settings, cover };
+  saveBlob(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), sanitizeFileName(`Шаблон ${tpl.name}`) + '.json');
+}
+async function importTemplateFile(file) {
+  try {
+    const o = JSON.parse(await file.text());
+    if (!o || o.app !== 'dnevnik-creator-template' || !o.settings) throw new Error('это не файл шаблона Дневник‑Креатора');
+    const list = loadTemplates(); let name = String(o.name || file.name.replace(/\.json$/i, '')).trim() || 'Шаблон';
+    if (list.some((x) => x.name === name)) name += ' (импорт)';
+    const id = uid('tpl'); const settings = {}; for (const k of TPL_PARTS) if (o.settings[k]) settings[k] = o.settings[k];
+    const tpl = { id, name, savedAt: o.savedAt || new Date().toISOString(), settings, cover: o.cover && o.cover.dataUrl ? { name: o.cover.name || 'cover.jpg' } : null };
+    if (tpl.cover) { const blob = await (await fetch(o.cover.dataUrl)).blob(); await DB.kvSet('tplcover:' + id, { blob, name: tpl.cover.name }); }
+    if (!storeTemplates([...list, tpl])) return;
+    lastTplId = id; renderTab();
+    if (confirm(`Шаблон «${name}» добавлен. Применить его сейчас?`)) await applyTemplate(tpl, { coverDataUrl: tpl.cover ? o.cover.dataUrl : null });
+    else toast(`Шаблон «${name}» добавлен в «Мои шаблоны»`, 'ok');
+  } catch (e) { toast('Не удалось открыть шаблон: ' + e.message, 'error', 6000); }
+}
+
 /* ---------- Вкладка «Экспорт» ---------- */
 function exportCandidates(scope = state.settings.export.scope) {
-  if (scope === 'all') return state.students.slice();
-  if (scope === 'ready') return state.students.filter((s) => statusOf(s) !== 'error');
-  return state.students.filter((s) => photoOf(s) && photoOf(s).status !== 'error');
+  const cf = state.ui.classFilter; const base = cf ? state.students.filter((s) => classOf(s) === cf) : state.students.slice();
+  if (scope === 'all') return base;
+  if (scope === 'ready') return base.filter((s) => statusOf(s) !== 'error');
+  return base.filter((s) => photoOf(s) && photoOf(s).status !== 'error');
 }
 function renderExportTab(body) {
   const e = state.settings.export; const n = exportCandidates().length;
@@ -2048,33 +2455,37 @@ function renderExportTab(body) {
   const geo = state.cover ? coverGeo() : null; const cdpi = geo ? Math.round(DPI / geo.sx) : 0;
   const issuesList = [...errs, ...warns].slice(0, 60).map((s) => {
     const pf = preflight(s).filter((i) => i.level !== 'info');
-    return `<li><button class="w-full rounded-lg px-2 py-1.5 text-left text-xs hover:bg-slate-50" data-goto="${s.id}"><span class="font-semibold ${statusOf(s) === 'error' ? 'text-red-700' : 'text-amber-800'}">${esc(s.num)} ${esc(s.nameNom || s.nameGen || 'без имени')}</span><span class="block text-slate-500">${esc(pf.map((i) => i.text).join(' · '))}</span></button></li>`;
+    return `<li><button class="w-full rounded-lg px-2 py-1.5 text-left text-xs hover:bg-slate-50" data-goto="${esc(s.id)}"><span class="font-semibold ${statusOf(s) === 'error' ? 'text-red-700' : 'text-amber-800'}">${esc(s.num)} ${esc(s.nameNom || s.nameGen || 'без имени')}</span><span class="block text-slate-500">${esc(pf.map((i) => i.text).join(' · '))}</span></button></li>`;
   }).join('');
   body.innerHTML = `<div class="space-y-3 pt-1">
     <div class="card space-y-2.5 p-3">
       <h3 class="text-sm font-bold text-slate-900">Текущий разворот</h3>
       <p class="text-xs text-slate-500">А4 альбомный 297×210 мм · 3508×2480 px · 300 DPI (метаданные DPI записываются в файл)</p>
       <div class="grid grid-cols-3 gap-2">
-        <button class="btn btn-sm" data-action="export-current" data-fmt="png">PNG</button>
-        <button class="btn btn-sm" data-action="export-current" data-fmt="jpg">JPEG</button>
-        <button class="btn btn-sm" data-action="export-current" data-fmt="pdf">PDF</button>
+        <button class="btn btn-sm" data-action="export-current" data-fmt="png" ${state.ui.busy ? 'disabled' : ''}>PNG</button>
+        <button class="btn btn-sm" data-action="export-current" data-fmt="jpg" ${state.ui.busy ? 'disabled' : ''}>JPEG</button>
+        <button class="btn btn-sm" data-action="export-current" data-fmt="pdf" ${state.ui.busy ? 'disabled' : ''}>PDF</button>
       </div>
     </div>
     <div class="card space-y-3 p-3">
       <h3 class="text-sm font-bold text-slate-900">Пакетный экспорт</h3>
       <label class="block"><span class="lbl">Результат</span><select class="inp inp-sm" data-k="export.batchFormat">
-        <option value="zip-png" ${e.batchFormat === 'zip-png' ? 'selected' : ''}>ZIP-архив с PNG (без потерь, крупные файлы)</option>
-        <option value="zip-jpg" ${e.batchFormat === 'zip-jpg' ? 'selected' : ''}>ZIP-архив с JPEG (компактно)</option>
-        <option value="pdf" ${e.batchFormat === 'pdf' ? 'selected' : ''}>Единый многостраничный PDF</option></select></label>
+        <option value="zip-jpg" ${e.batchFormat === 'zip-jpg' ? 'selected' : ''}>ZIP-архив с JPEG 300 DPI (≈2–3 МБ на разворот)</option>
+        <option value="pdf" ${e.batchFormat === 'pdf' ? 'selected' : ''}>Единый многостраничный PDF (A4)</option>
+        <option value="zip-png" ${e.batchFormat === 'zip-png' ? 'selected' : ''}>ZIP-архив с PNG без потерь (≈18 МБ на разворот)</option>
+        ${window.showDirectoryPicker ? `<option value="dir-jpg" ${e.batchFormat === 'dir-jpg' ? 'selected' : ''}>Сразу в папку на диске — JPEG</option><option value="dir-png" ${e.batchFormat === 'dir-png' ? 'selected' : ''}>Сразу в папку на диске — PNG (для больших классов)</option>` : ''}</select></label>
+      ${e.batchFormat === 'zip-png' ? `<p class="-mt-1 text-[11px] leading-snug text-amber-700">Архив PNG на ${n} ${plural(n, 'разворот', 'разворота', 'разворотов')} ≈ ${Math.round(n * 17.6)} МБ собирается в памяти браузера. Для больших классов удобнее JPEG, PDF${window.showDirectoryPicker ? ' или «Сразу в папку»' : ''}.</p>` : ''}
       <label class="block"><span class="lbl">Кого экспортировать</span><select class="inp inp-sm" data-k="export.scope">
-        <option value="withPhoto" ${e.scope === 'withPhoto' ? 'selected' : ''}>Учеников с фото (${exportCandidates('withPhoto').length})</option>
-        <option value="ready" ${e.scope === 'ready' ? 'selected' : ''}>Только без ошибок (${exportCandidates('ready').length})</option>
-        <option value="all" ${e.scope === 'all' ? 'selected' : ''}>Всех (без фото — пустая рамка) (${all.length})</option></select></label>
-      ${e.batchFormat !== 'zip-png' ? `<div class="grid grid-cols-[1fr_auto] items-center gap-x-2"><span class="text-xs font-semibold text-slate-600">Качество JPEG</span><span class="text-xs tabular-nums" data-kv="export.jpegQuality">${Math.round(e.jpegQuality * 100)}%</span><input class="col-span-2" type="range" min="0.8" max="1" step="0.01" value="${e.jpegQuality}" data-k="export.jpegQuality"></div>` : ''}
-      ${e.batchFormat !== 'pdf' ? `<label class="block"><span class="lbl">Имена файлов</span><input class="inp inp-sm" data-k="export.pattern" value="${esc(e.pattern)}"><span class="mt-1 block text-[11px] text-slate-500">Подстановки: <code>{номер}</code>, <code>{фио_им}</code>, <code>{фио}</code>, <code>{класс}</code>. Пример: <b>${esc(fileBaseName(all[0] || STUB))}.png</b></span></label>` : ''}
+        <option value="ready" ${e.scope === 'ready' ? 'selected' : ''}>Готовые — без ошибок (${exportCandidates('ready').length})</option>
+        <option value="withPhoto" ${e.scope === 'withPhoto' ? 'selected' : ''}>Все с фото, включая ошибки (${exportCandidates('withPhoto').length})</option>
+        <option value="all" ${e.scope === 'all' ? 'selected' : ''}>Всех (без фото — пустая рамка) (${exportCandidates('all').length})</option></select></label>
+      ${classList().length > 1 ? `<label class="block"><span class="lbl">Класс</span><select class="inp inp-sm" id="expClass"><option value="">Все классы — по папкам (${classList().length})</option>${classList().map((c) => `<option value="${esc(c)}" ${c === state.ui.classFilter ? 'selected' : ''}>${esc(c || 'без класса')}</option>`).join('')}</select></label>` : ''}
+      ${!/png$/.test(e.batchFormat) ? `<div class="grid grid-cols-[1fr_auto] items-center gap-x-2"><span class="text-xs font-semibold text-slate-600">Качество JPEG</span><span class="text-xs tabular-nums" data-kv="export.jpegQuality">${Math.round(e.jpegQuality * 100)}%</span><input class="col-span-2" type="range" min="0.8" max="1" step="0.01" value="${e.jpegQuality}" data-k="export.jpegQuality"></div>` : ''}
+      ${e.batchFormat !== 'pdf' ? `<label class="block"><span class="lbl">Имена файлов</span><input class="inp inp-sm" data-k="export.pattern" value="${esc(e.pattern)}"><span class="mt-1 block text-[11px] text-slate-500">Подстановки: <code>{номер}</code>, <code>{фио_им}</code>, <code>{фио}</code>, <code>{класс}</code>. Пример: <b id="patternExample">${esc(fileBaseName(all[0] || STUB))}.png</b></span></label>` : ''}
       <label class="chk flex"><input type="checkbox" data-k="export.foldMarks" ${e.foldMarks ? 'checked' : ''}><span>Метки сгиба по центру (сверху и снизу)</span></label>
-      <button class="btn btn-primary w-full" data-action="export-batch" ${n ? '' : 'disabled'}>${icon('zip')}Экспортировать ${n} ${plural(n, 'разворот', 'разворота', 'разворотов')}</button>
-      ${errs.length && e.scope !== 'ready' ? `<p class="text-[11px] leading-snug text-amber-700">У ${errs.length} ${plural(errs.length, 'ученика', 'учеников', 'учеников')} есть ошибки (см. ниже). Их развороты тоже попадут в экспорт, если есть фото.</p>` : ''}
+      <button class="btn btn-primary w-full" data-action="export-batch" ${n && !state.ui.busy ? '' : 'disabled'}>${icon('zip')}Экспортировать ${n} ${plural(n, 'разворот', 'разворота', 'разворотов')}</button>
+      ${errs.length && e.scope !== 'ready' ? `<p class="text-[11px] leading-snug text-amber-700">У ${errs.length} ${plural(errs.length, 'ученика', 'учеников', 'учеников')} есть ошибки (см. ниже). Перед экспортом приложение спросит, включать ли их.</p>` : ''}
+      <p class="text-[11px] leading-snug text-slate-500">Экспорт продолжается и в фоновой вкладке — можно переключиться на другие дела; прогресс виден в заголовке вкладки.</p>
     </div>
     <div class="card p-3">
       <h3 class="mb-2 text-sm font-bold text-slate-900">Предпечатная проверка класса</h3>
@@ -2134,7 +2545,7 @@ function fileBaseName(st) {
     if (k === 'номер') return pad2(st.num, total);
     if (k === 'фио_им') return st.nameNom || st.nameGen || '';
     if (k === 'фио') return st.nameGen || st.nameNom || '';
-    if (k === 'класс') return state.settings.text.className || '';
+    if (k === 'класс') return classOf(st);
     return m;
   });
   return sanitizeFileName(name.replace(/^[_\s-]+|[_\s-]+$/g, '')) || 'razvorot';
@@ -2146,51 +2557,77 @@ function exportStatic() {
   cache.exportStatic = { key, canvas: c };
   return c;
 }
-async function renderExport(st, staticC, out) {
+/* Выполнить синхронный код с «замороженными» настройками (снимок на момент старта экспорта) */
+function underSettings(snap, fn) { if (!snap) return fn(); const live = state.settings; state.settings = snap; try { return fn(); } finally { state.settings = live; } }
+/* Рисует разворот. Возвращает false, если у ученика есть фото, но его не удалось прочитать (тогда разворот не сохраняем). */
+async function renderExport(st, staticC, out, snap = null) {
   const ph = photoOf(st); let img = null;
-  if (ph && ph.status !== 'error') { try { img = await PhotoCache.get('full', ph); } catch (e) { ph.status = 'error'; ph.err = 'файл не читается'; } }
-  const ctx = out.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  ctx.drawImage(staticC, 0, 0);
-  RS = 1;
-  drawPortrait(ctx, st, { img, preview: false });
-  drawTextBlock(ctx, st);
-  if (state.settings.export.foldMarks) drawFoldMarks(ctx);
+  if (ph && ph.status !== 'error') { try { img = await PhotoCache.get('full', ph); } catch (e) { ph.status = 'error'; ph.err = ph.err || 'файл не читается'; } }
+  underSettings(snap, () => {
+    const ctx = out.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(staticC, 0, 0);
+    RS = 1;
+    drawPortrait(ctx, st, { img, preview: false });
+    drawTextBlock(ctx, st);
+    if (state.settings.export.foldMarks) drawFoldMarks(ctx);
+  });
+  return !ph || !!img;
 }
-async function ensureFonts(extra = '') {
-  if (!document.fonts || !document.fonts.load) return;
+const fontLoaded = (family) => [...document.fonts].some((f) => f.family.replace(/["']/g, '') === family && f.status === 'loaded');
+/* Догружает веб-шрифты надписи; возвращает список семейств, которые так и не загрузились */
+async function ensureFonts(extra = '', wait = 5000) {
+  if (!document.fonts || !document.fonts.load) return [];
   const t = state.settings.text, b = state.settings.back;
-  const fams = new Set([t.titleFont, t.bodyFont, t.nameFont, b.captionFont, 'Noto Serif', 'Noto Sans'].filter((f) => WEB_FONTS.includes(f)));
+  const used = [t.titleFont, t.bodyFont, t.nameFont, ...(b.caption.trim() ? [b.captionFont] : [])].filter((f) => WEB_FONTS.includes(f));
+  const fams = new Set([...used, 'Noto Serif', 'Noto Sans'].filter((f) => WEB_FONTS.includes(f)));
   const sample = FONT_SAMPLE + extra;
   const jobs = [];
   for (const f of fams) for (const w of [400, 700]) jobs.push(document.fonts.load(`${w} 40px "${f}"`, sample).catch(() => {}));
-  await Promise.race([Promise.all(jobs), sleep(5000)]);
+  await Promise.race([Promise.all(jobs), sleep(wait)]);
+  return [...new Set(used)].filter((f) => !fontLoaded(f));
+}
+class CancelError extends Error { constructor() { super('Экспорт отменён'); this.cancelled = true; } }
+const checkCancel = (job) => { if (job && job.cancel) throw new CancelError(); };
+/* Экспорт не должен молча печатать запасным шрифтом: ждём до ~25 с, затем спрашиваем */
+async function ensureExportFonts(text, job) {
+  let missing = await ensureFonts(text, 4000); const until = Date.now() + 25000;
+  while (missing.length && Date.now() < until) { checkCancel(job); showProgress('Загрузка шрифтов…', missing.join(', '), 0.02); await sleep(1000); missing = await ensureFonts(text, 1500); }
+  if (missing.length && !confirm(`Не загрузились шрифты: ${missing.join(', ')} (нет интернета?).\n\nПродолжить с системными шрифтами? Надпись будет выглядеть иначе, чем в задуманном макете.`)) throw new CancelError();
 }
 const exportTextOf = (list) => list.map((s) => buildLines(s).map((l) => l.text).join('')).join('') + state.settings.back.caption;
 let exportJob = null;
+const APP_TITLE = document.title;
 function showProgress(title, text, frac) {
   const d = $('#progressDock'); d.classList.remove('hidden');
   $('#progTitle').textContent = title; $('#progText').textContent = text || ''; $('#progBar').style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`;
+  document.title = `⏳ ${Math.round(clamp(frac, 0, 1) * 100)}% · ${APP_TITLE}`; // видно и в фоновой вкладке
 }
-const hideProgress = () => $('#progressDock').classList.add('hidden');
+const hideProgress = () => { $('#progressDock').classList.add('hidden'); document.title = APP_TITLE; };
 function setBusy(b) { state.ui.busy = b; $$('[data-action="export-current"],[data-action="export-batch"]').forEach((x) => { x.disabled = b; }); }
+async function wakeLock() { try { return await navigator.wakeLock?.request('screen'); } catch (e) { return null; } }
+/* toBlob на холсте 3508×2480 изредка возвращает null при нехватке памяти — пробуем ещё раз */
+async function encodeCanvas(c, type, q) { try { return await canvasToBlob(c, type, q); } catch (e) { await sleep(150); return canvasToBlob(c, type, q); } }
+async function encodeSpread(c, ext, q) { return ext === 'png' ? pngWithDpi(await encodeCanvas(c, 'image/png'), DPI) : jpegWithDpi(await encodeCanvas(c, 'image/jpeg', q), DPI); }
 async function exportCurrent(fmt) {
   const st = current(); if (!st) { toast('Сначала добавьте ученика', 'warn'); return; }
   if (state.ui.busy) { toast('Идёт экспорт — дождитесь окончания', 'warn'); return; }
-  setBusy(true); exportJob = { cancel: false };
+  setBusy(true); const job = exportJob = { cancel: false };
   try {
-    showProgress('Готовлю разворот…', st.nameNom, 0.15); await nextFrame();
-    if (fmt === 'pdf' && !(await ensureLib('jspdf'))) throw new Error('Не удалось загрузить jsPDF (нет доступа к CDN)');
-    await ensureLib('filesaver');
-    await ensureFonts(exportTextOf([st]));
-    const staticC = exportStatic(); showProgress('Готовлю разворот…', st.nameNom, 0.5); await nextFrame();
-    const out = createCanvas(SPREAD_W, SPREAD_H); await renderExport(st, staticC, out);
-    const base = fileBaseName(st); const q = state.settings.export.jpegQuality;
-    showProgress('Кодирую файл…', base, 0.8); await nextFrame();
-    if (fmt === 'png') saveBlob(await pngWithDpi(await canvasToBlob(out, 'image/png'), DPI), base + '.png');
-    else if (fmt === 'jpg') saveBlob(await jpegWithDpi(await canvasToBlob(out, 'image/jpeg', q), DPI), base + '.jpg');
-    else { const doc = newPdf(); await addPdfPage(doc, out, true, q); saveBlob(doc.output('blob'), base + '.pdf'); }
+    showProgress('Готовлю разворот…', st.nameNom, 0.15); await yieldUI();
+    if (fmt === 'pdf' && !(await ensureLib('jspdf'))) throw new Error('Не удалось загрузить jsPDF (нет доступа к CDN). Сохраните PNG или JPEG — они работают без интернета.');
+    ensureLib('filesaver'); // не ждём: сохранение работает и без FileSaver
+    const ph = photoOf(st); if (ph && ph.status === 'pending') await processThumbs();
+    await ensureExportFonts(exportTextOf([st]), job);
+    const snap = deepClone(state.settings);
+    const staticC = exportStatic(); showProgress('Готовлю разворот…', st.nameNom, 0.5); await yieldUI();
+    const out = createCanvas(SPREAD_W, SPREAD_H); const ok = await renderExport(st, staticC, out, snap);
+    if (!ok && !confirm(`Фото «${ph.name}» не удалось прочитать (${ph.err || 'ошибка файла'}). Сохранить разворот с пустой рамкой?`)) throw new CancelError();
+    const base = underSettings(snap, () => fileBaseName(st)); const q = snap.export.jpegQuality;
+    showProgress('Кодирую файл…', base, 0.8); await yieldUI(); checkCancel(job);
+    if (fmt === 'png' || fmt === 'jpg') { const blob = await encodeSpread(out, fmt, q); checkCancel(job); saveBlob(blob, `${base}.${fmt}`); }
+    else { const doc = newPdf(); await addPdfPage(doc, await encodeCanvas(out, 'image/jpeg', q), true); checkCancel(job); saveBlob(pdfBlob(doc), base + '.pdf'); }
     toast(`Готово: ${base}.${fmt}`, 'ok');
-  } catch (e) { console.error(e); toast('Ошибка экспорта: ' + (e.message || e), 'error', 7000); }
+  } catch (e) { if (e.cancelled) toast('Экспорт отменён', 'warn'); else { console.error(e); toast('Ошибка экспорта: ' + (e.message || e), 'error', 8000); } }
   finally { setBusy(false); hideProgress(); exportJob = null; }
 }
 function newPdf() {
@@ -2199,59 +2636,123 @@ function newPdf() {
   doc.setProperties({ title: 'Развороты дневников', creator: 'Дневник‑Креатор' });
   return doc;
 }
-async function addPdfPage(doc, canvas, first, q) {
-  const blob = await canvasToBlob(canvas, 'image/jpeg', q);
-  const u8 = new Uint8Array(await blob.arrayBuffer());
+async function addPdfPage(doc, jpegBlob, first) {
+  const u8 = new Uint8Array(await jpegBlob.arrayBuffer());
   if (!first) doc.addPage('a4', 'landscape');
   doc.addImage(u8, 'JPEG', 0, 0, 297, 210, undefined, 'NONE');
+  return u8.length;
 }
+function pdfBlob(doc) {
+  const b = doc.output('blob');
+  if (!(b instanceof Blob) || !b.size) throw new Error('PDF получился слишком большим для браузера — уменьшите качество JPEG или экспортируйте по классам');
+  return b;
+}
+/* Простой ZIP без сжатия (STORE) — запасной вариант, если JSZip не загрузился с CDN. Ссылается на Blob-ы, не копируя их. */
+class StoreZip {
+  constructor() { this.parts = []; this.central = []; this.offset = 0; this.count = 0; }
+  async add(path, blob) {
+    const name = new TextEncoder().encode(path); const data = new Uint8Array(await blob.arrayBuffer());
+    const crc = crc32(data), size = data.length, d = new Date();
+    const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    const lh = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, size, 4], [22, size, 4], [26, name.length, 2], [28, 0, 2]].forEach(([o, v, n]) => (n === 4 ? lh.setUint32(o, v, true) : lh.setUint16(o, v, true)));
+    const ch = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, size, 4], [24, size, 4], [28, name.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, this.offset, 4]].forEach(([o, v, n]) => (n === 4 ? ch.setUint32(o, v, true) : ch.setUint16(o, v, true)));
+    this.parts.push(lh.buffer, name, blob); this.central.push(ch.buffer, name);
+    this.offset += 30 + name.length + size; this.count++;
+  }
+  blob() {
+    const cd = this.central.reduce((a, x) => a + x.byteLength, 0); const e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, this.count, true); e.setUint16(10, this.count, true); e.setUint32(12, cd, true); e.setUint32(16, this.offset, true);
+    return new Blob([...this.parts, ...this.central, e.buffer], { type: 'application/zip' });
+  }
+}
+async function writeToDir(dir, sub, name, blob) {
+  const d = sub ? await dir.getDirectoryHandle(sub, { create: true }) : dir;
+  const fh = await d.getFileHandle(name, { create: true }); const w = await fh.createWritable();
+  try { await w.write(blob); } finally { await w.close(); }
+}
+const PDF_PART_LIMIT = 300 * 1024 * 1024; // jsPDF собирает документ в одну строку — большие PDF делим на части
 async function exportBatch() {
   if (state.ui.busy) { toast('Экспорт уже идёт', 'warn'); return; }
-  const list = exportCandidates(); if (!list.length) { toast('Нет разворотов для экспорта с текущими условиями', 'warn'); return; }
-  const fmt = state.settings.export.batchFormat; const q = state.settings.export.jpegQuality;
-  setBusy(true); const job = exportJob = { cancel: false };
+  const fmt = state.settings.export.batchFormat; // zip-jpg | zip-png | pdf | dir-jpg | dir-png
+  let dir = null;
+  if (fmt.startsWith('dir-')) { // выбор папки — сразу по щелчку, пока действует жест пользователя
+    if (!window.showDirectoryPicker) { toast('Этот браузер не умеет сохранять в папку — выберите ZIP или PDF', 'warn'); return; }
+    try { dir = await window.showDirectoryPicker({ id: 'dnevnik-export', mode: 'readwrite' }); } catch (e) { return; }
+  }
+  setBusy(true); const job = exportJob = { cancel: false }; const lock = await wakeLock();
+  const failed = []; let done = 0; let cancelled = false;
   try {
-    showProgress('Подготовка пакетного экспорта…', 'загрузка библиотек и шрифтов', 0.01); await nextFrame();
-    if (fmt === 'pdf') { if (!(await ensureLib('jspdf'))) throw new Error('Не удалось загрузить jsPDF (нет доступа к CDN)'); }
-    else if (!(await ensureLib('jszip'))) throw new Error('Не удалось загрузить JSZip (нет доступа к CDN)');
-    await ensureLib('filesaver');
-    await ensureFonts(exportTextOf(list));
-    showProgress('Подготовка фона и обложки…', 'повышение резкости, текстуры', 0.03); await nextFrame();
-    const staticC = exportStatic();
+    if ([...state.photos.values()].some((p) => p.status === 'pending')) { showProgress('Читаю фото…', 'проверка файлов перед экспортом', 0.01); await processThumbs(); }
+    checkCancel(job);
+    const list = exportCandidates(); if (!list.length) { toast('Нет разворотов для экспорта с текущими условиями', 'warn'); return; }
+    const bad = list.filter((s) => statusOf(s) === 'error');
+    if (bad.length && !confirm(`У ${bad.length} ${plural(bad.length, 'разворота', 'разворотов', 'разворотов')} есть ошибки (нет фото, пола или родительного падежа):\n${bad.slice(0, 8).map((s) => `${s.num} ${s.nameNom || s.nameGen}`).join('\n')}${bad.length > 8 ? '\n…' : ''}\n\nВсё равно включить их в экспорт?`)) return;
+    const snap = deepClone(state.settings); // правки макета во время экспорта не должны давать «смешанную» пачку
+    const q = snap.export.jpegQuality, ext = /png$/.test(fmt) ? 'png' : 'jpg';
+    showProgress('Подготовка пакетного экспорта…', 'загрузка библиотек и шрифтов', 0.02); await yieldUI();
+    let zip = null, store = null;
+    if (fmt === 'pdf') { if (!(await ensureLib('jspdf'))) throw new Error('Не удалось загрузить jsPDF (нет доступа к CDN). Выберите ZIP — он работает и без интернета.'); }
+    else if (fmt.startsWith('zip-')) { if (await ensureLib('jszip')) zip = new window.JSZip(); else store = new StoreZip(); }
+    checkCancel(job);
+    ensureLib('filesaver');
+    await ensureExportFonts(exportTextOf(list), job);
+    showProgress('Подготовка фона и обложки…', 'повышение резкости, текстуры', 0.03); await yieldUI();
+    const staticC = underSettings(snap, () => exportStatic());
     const out = createCanvas(SPREAD_W, SPREAD_H);
-    const zip = fmt === 'pdf' ? null : new window.JSZip(); const doc = fmt === 'pdf' ? newPdf() : null;
-    const folder = zip ? zip.folder(sanitizeFileName(`Дневники ${state.settings.text.className}`.trim())) : null;
-    const used = new Set(); let done = 0;
+    const clsOf = (st) => underSettings(snap, () => classOf(st));
+    const multiClass = new Set(list.map(clsOf)).size > 1;
+    const folder = sanitizeFileName(`Дневники ${(multiClass ? '' : clsOf(list[0])) || snap.text.className}`.trim());
+    const subOf = (st) => (multiClass ? sanitizeFileName(`Дневники ${clsOf(st) || 'без класса'}`) : '');
+    const baseName = sanitizeFileName(`Дневники_${(multiClass ? '' : clsOf(list[0])) || snap.text.className || 'класс'}_${localDate()}`);
+    let pdf = null, pdfBytes = 0; const pdfParts = [];
+    const used = new Set();
     for (const st of list) {
-      if (job.cancel) break;
-      showProgress(`Разворот ${done + 1} из ${list.length}`, st.nameNom || st.nameGen, 0.05 + 0.85 * done / list.length); await nextFrame();
-      await renderExport(st, staticC, out);
-      if (doc) await addPdfPage(doc, out, done === 0, q);
-      else {
-        const ext = fmt === 'zip-png' ? 'png' : 'jpg';
-        let name = fileBaseName(st) + '.' + ext; let n = 2; while (used.has(name.toLowerCase())) name = `${fileBaseName(st)} (${n++}).${ext}`; used.add(name.toLowerCase());
-        const blob = ext === 'png' ? await pngWithDpi(await canvasToBlob(out, 'image/png'), DPI) : await jpegWithDpi(await canvasToBlob(out, 'image/jpeg', q), DPI);
-        folder.file(name, blob, { binary: true, compression: 'STORE' });
-      }
-      done++;
+      if (job.cancel) { cancelled = true; break; }
+      showProgress(`Разворот ${done + failed.length + 1} из ${list.length}`, st.nameNom || st.nameGen, 0.05 + 0.85 * (done + failed.length) / list.length); await yieldUI();
+      try {
+        if (!(await renderExport(st, staticC, out, snap))) { const ph = photoOf(st); failed.push({ st, err: `фото «${ph ? ph.name : ''}» не читается` }); continue; }
+        if (fmt === 'pdf') {
+          const jb = await encodeCanvas(out, 'image/jpeg', q);
+          if (pdf && pdfBytes + jb.size > PDF_PART_LIMIT) { pdfParts.push(pdfBlob(pdf)); pdf = null; pdfBytes = 0; }
+          if (!pdf) pdf = newPdf();
+          pdfBytes += await addPdfPage(pdf, jb, pdfBytes === 0);
+        } else {
+          const base = underSettings(snap, () => fileBaseName(st)); const sub = subOf(st);
+          let name = `${base}.${ext}`; let n = 2; while (used.has((sub + '/' + name).toLowerCase())) name = `${base} (${n++}).${ext}`; used.add((sub + '/' + name).toLowerCase());
+          const blob = await encodeSpread(out, ext, q);
+          if (dir) await writeToDir(dir, sub, name, blob);
+          else if (zip) zip.folder(sub || folder).file(name, blob, { binary: true, compression: 'STORE' });
+          else await store.add(`${sub || folder}/${name}`, blob);
+        }
+        done++;
+      } catch (e) { console.error(e); failed.push({ st, err: e.message || String(e) }); }
     }
-    if (job.cancel) { toast(`Экспорт отменён (готово ${done} из ${list.length})`, 'warn'); return; }
-    const baseName = sanitizeFileName(`Дневники_${state.settings.text.className || 'класс'}_${new Date().toISOString().slice(0, 10)}`);
-    if (doc) { showProgress('Сборка PDF…', `${done} страниц`, 0.95); await nextFrame(); saveBlob(doc.output('blob'), baseName + '.pdf'); }
-    else {
-      const blob = await zip.generateAsync({ type: 'blob', streamFiles: true }, (m) => showProgress('Упаковка ZIP…', `${Math.round(m.percent)}%`, 0.9 + 0.1 * m.percent / 100));
-      saveBlob(blob, baseName + '.zip');
-    }
-    toast(`Готово: ${done} ${plural(done, 'разворот', 'разворота', 'разворотов')}`, 'ok', 5000);
-  } catch (e) { console.error(e); toast('Ошибка пакетного экспорта: ' + (e.message || e), 'error', 8000); }
-  finally { setBusy(false); hideProgress(); exportJob = null; }
+    if (cancelled && (!done || dir || !confirm(`Экспорт остановлен. Сохранить уже готовые развороты (${done})?`))) { toast(dir ? `Экспорт остановлен. В папку записано: ${done}` : 'Экспорт отменён', 'warn', 6000); return; }
+    if (!done) throw new Error('ни один разворот не удалось подготовить');
+    job.cancel = false; // «Отмена» во время упаковки
+    if (fmt === 'pdf') {
+      showProgress('Сборка PDF…', `${done} страниц`, 0.95); await yieldUI();
+      if (pdf) pdfParts.push(pdfBlob(pdf));
+      checkCancel(job);
+      pdfParts.forEach((b, i) => saveBlob(b, pdfParts.length > 1 ? `${baseName}_часть${i + 1}.pdf` : `${baseName}.pdf`));
+    } else if (zip) {
+      const blob = await zip.generateAsync({ type: 'blob', streamFiles: true }, (m) => { if (job.cancel) throw new CancelError(); showProgress('Упаковка ZIP…', `${Math.round(m.percent)}%`, 0.9 + 0.1 * m.percent / 100); });
+      checkCancel(job); saveBlob(blob, baseName + '.zip');
+    } else if (store) { showProgress('Упаковка ZIP…', `${done} файлов`, 0.97); await yieldUI(); checkCancel(job); saveBlob(store.blob(), baseName + '.zip'); }
+    const fails = failed.length ? ` · не удалось: ${failed.length} (${failed.slice(0, 3).map((f) => `${f.st.num} ${f.st.nameNom || f.st.nameGen} — ${f.err}`).join('; ')}${failed.length > 3 ? '; …' : ''})` : '';
+    toast(`Готово: ${done} ${plural(done, 'разворот', 'разворота', 'разворотов')}${dir ? ' записано в папку' : ''}${fails}`, failed.length ? 'warn' : 'ok', failed.length ? 15000 : 5000);
+  } catch (e) { if (e.cancelled) toast('Экспорт отменён', 'warn'); else { console.error(e); toast('Ошибка пакетного экспорта: ' + (e.message || e), 'error', 9000); } }
+  finally { setBusy(false); hideProgress(); exportJob = null; try { await lock?.release(); } catch (e) { /* ignore */ } if (state.ui.tab === 'export') renderTab(); }
 }
 
 /* =====================================================================
  * 13. ИМПОРТ: модальное окно вставки и редактор таблицы
  * ===================================================================== */
 const imp = { text: '', rows: [], roles: [], header: false, mode: 'replace', autoGender: true, autoDecline: true, tab: 'paste' };
-function closeModal() { $('#modalRoot').innerHTML = ''; document.body.style.overflow = ''; }
+let modalReturnFocus = null;
+function closeModal() { $('#modalRoot').innerHTML = ''; document.body.style.overflow = ''; if (modalReturnFocus && document.contains(modalReturnFocus)) modalReturnFocus.focus({ preventScroll: true }); modalReturnFocus = null; }
 function openImportModal(prefill, tab = 'paste') {
   if (prefill != null) imp.text = prefill;
   imp.tab = tab;
@@ -2265,10 +2766,13 @@ function openImportModal(prefill, tab = 'paste') {
       <div id="mBody" class="p-4 sm:p-5"></div>
     </div></div>`;
   document.body.style.overflow = 'hidden';
+  modalReturnFocus = document.activeElement;
   renderModalBody();
+  setTimeout(() => { const dlg = $('#modalRoot [role="dialog"]'); if (dlg && !dlg.contains(document.activeElement)) (dlg.querySelector('textarea, input, select, button:not([data-close])') || dlg).focus(); }, 40);
 }
 function renderModalBody() {
   $$('#mTabs [data-mtab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mtab === imp.tab)));
+  const tt = $('#mTabs [data-mtab="table"]'); if (tt) tt.textContent = `Редактор таблицы (${state.students.length})`;
   const body = $('#mBody'); if (!body) return;
   if (imp.tab === 'paste') {
     body.innerHTML = `<div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
@@ -2304,7 +2808,7 @@ function renderModalBody() {
 function reparseImport() {
   const rows = parseDelimited(imp.text);
   const det = detectRoles(rows);
-  imp.header = det.header; imp.rows = det.header ? rows.slice(1) : rows;
+  imp.header = det.header; imp.headerIndex = det.headerIndex; imp.rows = det.header ? rows.slice(det.headerIndex + 1) : rows;
   if (!imp.rolesManual || imp.roles.length !== det.roles.length) { imp.roles = det.roles; imp.rolesManual = false; }
   renderParsePreview();
 }
@@ -2316,15 +2820,19 @@ function renderParsePreview() {
   const roleSel = (j) => `<select class="inp inp-sm !w-auto min-w-[8.5rem] font-bold normal-case tracking-normal" data-role-col="${j}">${Object.entries(ROLE_LABELS).map(([k, l]) => `<option value="${k}" ${imp.roles[j] === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
   const shown = imp.rows.slice(0, 300);
   el.innerHTML = `<table class="tbl"><thead><tr>${Array.from({ length: ncol }, (_, j) => `<th>${roleSel(j)}</th>`).join('')}<th>Итог для надписи</th></tr></thead><tbody>
-    ${shown.map((r, i) => { const s = studs[i]; return `<tr>${Array.from({ length: ncol }, (_, j) => `<td class="${imp.roles[j] === 'skip' ? 'text-slate-300' : ''}">${esc(r[j] || '')}</td>`).join('')}<td class="text-xs">${s ? `${s.gender ? `<span class="badge ${s.gender === 'M' ? 'badge-m' : 'badge-f'} ${s.genderGuessed ? 'guess' : ''}">${s.gender === 'M' ? 'М' : 'Ж'}</span>` : '<span class="badge badge-u">?</span>'} <span class="${s.genGuessed ? 'text-amber-700' : ''}">${esc(genderWord(s))} · ${esc(s.nameGen || '—')}</span>` : ''}</td></tr>`; }).join('')}
+    ${shown.map((r, i) => { const s = studs[i]; return `<tr>${Array.from({ length: ncol }, (_, j) => `<td class="${imp.roles[j] === 'skip' ? 'text-slate-300' : ''}">${esc(r[j] || '')}</td>`).join('')}<td class="text-xs">${s ? `${s.gender ? `<span class="badge ${s.gender === 'M' ? 'badge-m' : 'badge-f'} ${s.genderGuessed ? 'guess' : ''}">${s.gender === 'M' ? 'М' : 'Ж'}</span>` : '<span class="badge badge-u">?</span>'} <span class="${s.genGuessed ? 'text-amber-700' : ''}">${esc(genderWord(s))} · ${esc(nameFor(s) || '—')}${s.className ? ` · ${esc(s.className)}` : ''}</span>` : ''}</td></tr>`; }).join('')}
   </tbody></table>`;
   const nGuess = studs.filter((s) => s.genderGuessed || s.genGuessed).length;
-  $('#parseInfo').innerHTML = `${imp.header ? 'заголовок распознан · ' : ''}строк: <b>${studs.length}</b>${nGuess ? ` · <span class="text-amber-700">автоподбор: ${nGuess}</span>` : ''}`;
+  $('#parseInfo').innerHTML = `${imp.header ? `заголовок распознан${imp.headerIndex > 0 ? ` (пропущено строк сверху: ${imp.headerIndex})` : ''} · ` : ''}строк: <b>${studs.length}</b>${nGuess ? ` · <span class="text-amber-700">автоподбор: ${nGuess}</span>` : ''}`;
 }
 function doImport() {
   const studs = rowsToStudents(imp.rows, imp.roles, { autoGender: imp.autoGender, autoDecline: imp.autoDecline });
   if (!studs.length) { toast('Нечего импортировать — вставьте строки с ФИО', 'warn'); return; }
-  if (imp.mode === 'replace') { state.students = []; state.demo = false; }
+  if (imp.mode === 'replace') {
+    // новый класс: фото прежнего списка иначе «подставятся» новым ученикам по номерам 1.jpg, 2.jpg…
+    if (state.photos.size && state.students.length && !state.demo && confirm(`Список заменяется новым. Удалить из памяти ${state.photos.size} ${plural(state.photos.size, 'фото', 'фото', 'фото')} прежнего списка, чтобы они не подставились новым ученикам?\n\nОК — удалить (рекомендуется для нового класса), Отмена — оставить.`)) clearAllPhotos();
+    state.students = []; state.demo = false;
+  }
   let maxNum = Math.max(0, ...state.students.map((s) => +s.num || 0));
   for (const s of studs) { if (!s.num) s.num = String(++maxNum); else maxNum = Math.max(maxNum, +s.num || 0); }
   state.students.push(...studs);
@@ -2341,27 +2849,30 @@ function renderTableEditor(body) {
       <button class="btn btn-sm" data-mact="t-add">${icon('plus', 'h-3.5 w-3.5')}Строка</button>
       <button class="btn btn-sm" data-mact="t-decline">${icon('wand', 'h-3.5 w-3.5')}Просклонять пустые</button>
       <button class="btn btn-sm" data-mact="t-gender">${icon('wand', 'h-3.5 w-3.5')}Пол для пустых</button>
+      <button class="btn btn-sm" data-mact="t-confirm" title="Снять жёлтую пометку «подобрано автоматически» у всех — после проверки">${icon('check', 'h-3.5 w-3.5')}Автоподбор проверен</button>
       <button class="btn btn-sm" data-mact="t-renum">Перенумеровать 1…N</button>
       <button class="btn btn-sm" data-mact="t-copy">${icon('clipboard', 'h-3.5 w-3.5')}Копировать как TSV</button>
       <button class="btn btn-sm btn-danger ml-auto" data-mact="t-clear">${icon('trash', 'h-3.5 w-3.5')}Удалить всех</button>
     </div>
     <div class="thin-scroll max-h-[64vh] overflow-auto rounded-xl border border-slate-200">
-      <table class="tbl"><thead><tr><th class="w-16">№</th><th>ФИО (им. п.)</th><th>ФИО (род. п.) — для надписи</th><th class="w-24">Пол</th><th class="w-40">Имя файла</th><th class="w-44">Фото</th><th class="w-24"></th></tr></thead>
-      <tbody>${rows.length ? rows.map((s, i) => { const ph = photoOf(s); return `<tr data-tid="${s.id}">
+      <table class="tbl min-w-[900px]"><thead><tr><th class="w-16">№</th><th>ФИО (им. п.)</th><th>ФИО (род. п.) — для надписи</th><th class="w-24">Пол</th><th class="w-28">Класс</th><th class="w-40">Имя файла</th><th class="w-44">Фото</th><th class="w-24"></th></tr></thead>
+      <tbody>${rows.length ? rows.map((s, i) => { const ph = photoOf(s); return `<tr data-tid="${esc(s.id)}">
         <td><input class="inp inp-sm" data-tf="num" value="${esc(s.num)}"></td>
         <td><input class="inp inp-sm" data-tf="nameNom" value="${esc(s.nameNom)}"></td>
         <td><input class="inp inp-sm ${s.genGuessed ? 'bg-amber-50' : ''}" data-tf="nameGen" value="${esc(s.nameGen)}" title="${s.genGuessed ? 'Подобрано автоматически' : ''}"></td>
         <td><select class="inp inp-sm ${s.genderGuessed ? 'bg-amber-50' : ''} ${!s.gender ? 'bg-red-50' : ''}" data-tf="gender"><option value="">—</option><option value="M" ${s.gender === 'M' ? 'selected' : ''}>М</option><option value="F" ${s.gender === 'F' ? 'selected' : ''}>Ж</option></select></td>
+        <td><input class="inp inp-sm" data-tf="className" value="${esc(s.className)}" placeholder="${esc(state.settings.text.className)}"></td>
         <td><input class="inp inp-sm" data-tf="fileName" value="${esc(s.fileName)}"></td>
-        <td class="text-xs">${ph ? `<span class="${ph.status === 'error' ? 'text-red-600' : 'text-emerald-700'}" title="${esc(s.matchInfo || '')}">${esc(ph.name)}</span>` : '<span class="text-red-600">нет фото</span>'}</td>
+        <td class="text-xs" data-photo-cell>${tablePhotoCell(s)}</td>
         <td class="whitespace-nowrap"><button class="btn btn-ghost btn-xs" data-mact="t-up" title="Выше" ${i === 0 ? 'disabled' : ''}>${icon('up', 'h-3.5 w-3.5')}</button><button class="btn btn-ghost btn-xs" data-mact="t-down" title="Ниже" ${i === rows.length - 1 ? 'disabled' : ''}>${icon('down', 'h-3.5 w-3.5')}</button><button class="btn btn-ghost btn-xs text-red-600" data-mact="t-del" title="Удалить">${icon('trash', 'h-3.5 w-3.5')}</button></td>
-      </tr>`; }).join('') : '<tr><td colspan="7" class="p-6 text-center text-slate-400">Список пуст — добавьте строку или вставьте данные из Excel.</td></tr>'}</tbody></table>
+      </tr>`; }).join('') : '<tr><td colspan="8" class="p-6 text-center text-slate-400">Список пуст — добавьте строку или вставьте данные из Excel.</td></tr>'}</tbody></table>
     </div>
     <div class="mt-4 flex justify-end border-t border-slate-200 pt-4"><button class="btn btn-primary" data-close>Готово</button></div>`;
 }
 function studentsToTsv() {
-  const head = 'Номер\tФИО_Именительный\tФИО_Родительный\tПол\tИмя_Файла';
-  return [head, ...state.students.map((s) => [s.num, s.nameNom, s.nameGen, s.gender === 'M' ? 'М' : s.gender === 'F' ? 'Ж' : '', s.fileName || photoOf(s)?.name || ''].join('\t'))].join('\n');
+  const withClass = state.students.some((s) => s.className);
+  const head = 'Номер\tФИО_Именительный\tФИО_Родительный\tПол\tИмя_Файла' + (withClass ? '\tКласс' : '');
+  return [head, ...state.students.map((s) => [s.num, s.nameNom, s.nameGen, s.gender === 'M' ? 'М' : s.gender === 'F' ? 'Ж' : '', s.fileName || photoOf(s)?.name || '', ...(withClass ? [s.className] : [])].join('\t'))].join('\n');
 }
 async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('Скопировано в буфер обмена — вставьте в Excel', 'ok'); } catch (e) { openImportModal(t); toast('Не удалось скопировать автоматически — текст открыт в окне вставки', 'warn'); } }
 async function readTableFile(file) {
@@ -2371,7 +2882,11 @@ async function readTableFile(file) {
     const ws = wb.Sheets[wb.SheetNames[0]];
     return window.XLSX.utils.sheet_to_csv(ws, { FS: '\t', blankrows: false });
   }
-  const buf = await file.arrayBuffer();
+  const buf = await file.arrayBuffer(); const b = new Uint8Array(buf);
+  // «Текст Юникод» из Excel — UTF-16 с BOM (только в нём сохраняются ҳ қ ғ ҷ ӣ ӯ)
+  if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf);
+  if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf);
+  if (b.length > 8 && b[1] === 0 && b[3] === 0 && b[5] === 0) return new TextDecoder('utf-16le').decode(buf);
   let text = new TextDecoder('utf-8').decode(buf);
   if (text.includes('�')) { try { text = new TextDecoder('windows-1251').decode(buf); } catch (e) { /* оставляем utf-8 */ } }
   return text;
@@ -2382,7 +2897,7 @@ async function readTableFile(file) {
  * ===================================================================== */
 function loadDemo() {
   const rows = parseDelimited(DEMO_TSV); const det = detectRoles(rows);
-  state.students = rowsToStudents(det.header ? rows.slice(1) : rows, det.roles, { autoGender: true, autoDecline: true });
+  state.students = rowsToStudents(det.header ? rows.slice(det.headerIndex + 1) : rows, det.roles, { autoGender: true, autoDecline: true });
   state.currentId = state.students[0]?.id || null; state.demo = true;
 }
 function saveProject() {
@@ -2434,14 +2949,14 @@ function onAction(act, el, e) {
     case 'export-batch': exportBatch(); break;
     case 'goto-export': state.ui.tab = 'export'; renderTab(); $('#editPanel').scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
     case 'cancel-export': if (exportJob) { exportJob.cancel = true; $('#progText').textContent = 'отмена…'; } break;
-    case 'toggle-menu': $('#projectMenu').classList.toggle('hidden'); break;
+    case 'toggle-menu': { const m = $('#projectMenu'); m.classList.toggle('hidden'); el.setAttribute('aria-expanded', String(!m.classList.contains('hidden'))); break; }
     case 'save-project': saveProject(); break;
     case 'open-project': { const i = $('#fileProject'); i.value = ''; i.click(); break; }
     case 'copy-tsv': copyText(studentsToTsv()); break;
     case 'load-demo': if (!state.students.length || confirm('Заменить текущий список демонстрационным?')) { loadDemo(); autoMatch(); renderAll(); saveState(); } break;
-    case 'clear-photos': if (confirm('Удалить все загруженные фото из памяти браузера? Список учеников останется.')) { state.photos.clear(); PhotoCache.maps.prev.clear(); PhotoCache.maps.full.clear(); DB.clearPhotos(); state.students.forEach((s) => { s.photoId = null; s.photoManual = false; s.avatarUrl = ''; }); autoMatch(); renderAll(); saveState(); } break;
+    case 'clear-photos': if (confirm('Удалить все загруженные фото из памяти браузера? Список учеников и кадрирование останутся.')) { clearAllPhotos(); autoMatch(); renderAll(); saveState(); } break;
     case 'reset-project': if (confirm('Начать новый проект? Список учеников, фото и настройки макета будут удалены из этого браузера.')) { state.photos.clear(); DB.clearPhotos(); DB.kvDel('cover'); state.students = []; state.currentId = null; state.demo = false; state.settings = deepClone(DEFAULTS); loadDefaultCover(); renderAll(); saveState(); } break;
-    case 'add-student': { const maxNum = Math.max(0, ...state.students.map((s) => +s.num || 0)); const st = newStudent({ num: String(maxNum + 1) }); state.students.push(st); state.demo = false; selectStudent(st.id); state.ui.tab = 'student'; renderTab(); setTimeout(() => $('[data-f="nameNom"]')?.focus(), 30); saveState(); break; }
+    case 'add-student': { state.ui.search = ''; state.ui.filter = 'all'; state.ui.classFilter = ''; const si = $('#search'); if (si) si.value = ''; const maxNum = Math.max(0, ...state.students.map((s) => +s.num || 0)); const st = newStudent({ num: String(maxNum + 1) }); state.students.push(st); state.demo = false; selectStudent(st.id); state.ui.tab = 'student'; renderTab(); setTimeout(() => $('[data-f="nameNom"]')?.focus(), 30); saveState(); break; }
     case 'prev': stepStudent(-1); break;
     case 'next': stepStudent(1); break;
     case 'toggle-layout': state.ui.layoutMode = !state.ui.layoutMode; renderToolbar(); schedulePreview(); if (state.ui.layoutMode) toast('Режим макета: тяните рамку или плашку мышью. Изменения общие для всех учеников.', 'info'); break;
@@ -2454,13 +2969,29 @@ function onTabAct(act, el) {
   switch (act) {
     case 'auto-gen': if (st) { if (!st.gender) { const g = guessGender(st.nameNom); if (g) { st.gender = g; st.genderGuessed = true; } } const d = declineName(st.nameNom, st.gender); if (!d) { toast('Укажите ФИО и пол, чтобы просклонять', 'warn'); break; } st.nameGen = d; st.genGuessed = true; patchListItem(st); renderTab(); schedulePreview(); saveState(); } break;
     case 'pick-photo': if (st) pickSinglePhoto(st.id); break;
-    case 'remove-photo': if (st) { st.photoId = null; st.photoManual = true; st.crop = defaultCrop(); st.avatarUrl = ''; autoMatch(); renderAll(); saveState(); } break;
-    case 'auto-photo': if (st) { st.photoManual = false; autoMatch(); renderAll(); saveState(); } break;
-    case 'crop-reset': if (st) { st.crop = defaultCrop(); onCropChanged(st); } break;
+    case 'confirm-gen': if (st) { st.genGuessed = false; patchListItem(st); renderTab(); saveState(); } break;
+    case 'remove-photo': if (st) { st.photoId = null; st.photoManual = true; st.photoRef = ''; st.avatarUrl = ''; autoMatch(); renderAll(); saveState(); } break;
+    case 'auto-photo': if (st) { st.photoManual = false; st.photoRef = ''; autoMatch(); renderAll(); saveState(); } break;
+    case 'crop-reset': if (st) { st.crop = defaultCrop(); onCropChanged(st, { touched: false }); } break;
     case 'face': if (st) detectFace(st); break;
-    case 'dup-crop': if (st && confirm('Применить масштаб и смещение этого ученика ко всем остальным?')) { for (const o of state.students) if (o !== st && photoOf(o)) o.crop = { ...st.crop }; updateAvatarsDebounced(); saveState(); toast('Кадрирование применено ко всем', 'ok'); } break;
+    case 'dup-crop': if (st) {
+      const targets = state.students.filter((o) => o !== st && photoOf(o) && !o.cropTouched);
+      if (!targets.length) { toast('У всех остальных кадрирование уже настроено вручную', 'info'); break; }
+      if (!confirm(`Применить кадрирование этого ученика к ${targets.length} ${plural(targets.length, 'ученику', 'ученикам', 'ученикам')}, у которых оно ещё не настроено вручную?`)) break;
+      const undo = targets.map((o) => [o, { ...o.crop }]);
+      for (const o of targets) o.crop = { ...st.crop };
+      lastCropUndo = undo; updateAvatarsDebounced(); saveState(); schedulePreview();
+      toast(`Кадрирование применено к ${targets.length}. Отменить: кнопка «Вернуть» рядом`, 'ok', 6000); renderTab();
+    } break;
+    case 'undo-dup': if (lastCropUndo) { for (const [o, c] of lastCropUndo) o.crop = c; lastCropUndo = null; updateAvatarsDebounced(); saveState(); schedulePreview(); renderTab(); toast('Кадрирование возвращено', 'ok'); } break;
     case 'delete-student': if (st && confirm(`Удалить «${st.nameNom || st.nameGen || 'ученика'}» из списка?`)) { const i = state.students.indexOf(st); state.students.splice(i, 1); autoMatch(); state.currentId = state.students[Math.min(i, state.students.length - 1)]?.id || null; renderAll(); saveState(); } break;
     case 'cover-upload': { const i = $('#fileCover'); i.value = ''; i.click(); break; }
+    case 'goto-template': state.ui.tab = 'layout'; openSections.add(LAYOUT_SCHEMA[0].title); renderTab(); $('#tabBody').scrollTop = 0; break;
+    case 'tpl-save': saveCurrentAsTemplate(); break;
+    case 'tpl-apply': { const tpl = loadTemplates().find((x) => x.id === $('#tplSelect')?.value); if (tpl && confirm(`Применить шаблон «${tpl.name}»? Текущие настройки макета будут заменены (список учеников и фото не меняются).`)) applyTemplate(tpl); break; }
+    case 'tpl-delete': { const id = $('#tplSelect')?.value; const tpl = loadTemplates().find((x) => x.id === id); if (tpl && confirm(`Удалить шаблон «${tpl.name}»?`)) { storeTemplates(loadTemplates().filter((x) => x.id !== id)); DB.kvDel('tplcover:' + id); if (lastTplId === id) lastTplId = null; renderTab(); } break; }
+    case 'tpl-export': { const tpl = loadTemplates().find((x) => x.id === $('#tplSelect')?.value); if (tpl) exportTemplate(tpl); break; }
+    case 'tpl-import': { const i = $('#fileTemplate'); i.value = ''; i.click(); break; }
     case 'cover-default': DB.kvDel('cover'); s.cover.defaultDesign = true; loadDefaultCover().then(() => renderTab()); break;
     case 'frame-reset': Object.assign(s.frame, deepClone(DEFAULTS.frame)); onSettingsChanged('frame.cx'); renderTab(); break;
     case 'text-reset': { const keep = { template: s.text.template, className: s.text.className }; s.text = { ...deepClone(DEFAULTS.text), ...keep }; onSettingsChanged('text.all'); renderTab(); break; }
@@ -2498,7 +3029,7 @@ function bindUI() {
   $('#studentList').addEventListener('dragover', (e) => { const li = e.target.closest('[data-id]'); if (li && (hasFiles(e) || e.dataTransfer.types.includes('text/photo-id'))) { e.preventDefault(); e.stopPropagation(); $$('.stu-item.drop-hover').forEach((x) => x.classList.remove('drop-hover')); li.classList.add('drop-hover'); } });
   $('#studentList').addEventListener('dragleave', (e) => { const li = e.target.closest('[data-id]'); if (li) li.classList.remove('drop-hover'); });
   $('#studentList').addEventListener('drop', async (e) => {
-    const li = e.target.closest('[data-id]'); if (!li) return; e.preventDefault(); e.stopPropagation(); li.classList.remove('drop-hover'); hideDrop();
+    const li = e.target.closest('[data-id]'); if (!li) return; e.preventDefault(); e.stopPropagation(); li.classList.remove('drop-hover'); dragDepth = 0; hideDrop();
     const st = state.students.find((s) => s.id === li.dataset.id); if (!st) return;
     const pid = e.dataTransfer.getData('text/photo-id');
     if (pid && state.photos.has(pid)) { assignPhoto(st, pid); selectStudent(st.id); return; }
@@ -2510,29 +3041,36 @@ function bindUI() {
   $('#unmatchedBox').addEventListener('dragstart', (e) => { const b = e.target.closest('[data-assign-photo]'); if (b) { e.dataTransfer.setData('text/photo-id', b.dataset.assignPhoto); e.dataTransfer.effectAllowed = 'link'; } });
   $('#search').addEventListener('input', (e) => { state.ui.search = e.target.value; renderList(); });
   $('#listFilter').addEventListener('click', (e) => { const b = e.target.closest('[data-filter]'); if (b) { state.ui.filter = b.dataset.filter; renderList(); } });
+  $('#classFilter').addEventListener('change', (e) => { state.ui.classFilter = e.target.value; renderList(); if (state.ui.tab === 'export') renderTab(); });
   $('#viewSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) { state.ui.view = b.dataset.view; renderToolbar(); layoutPreview(); } });
   $$('[data-guide]').forEach((i) => i.addEventListener('change', () => { state.settings.guides[i.dataset.guide] = i.checked; schedulePreview(); saveState(); if (state.ui.tab === 'layout') syncLayoutInputs(); }));
   $('#tabSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) { state.ui.tab = b.dataset.tab; renderTab(); } });
   // вкладки: поля
   const tb = $('#tabBody');
+  tb.addEventListener('pointerdown', (e) => { if (e.target.type === 'range') activeRange = e.target; });
+  window.addEventListener('pointerup', () => { if (activeRange) { activeRange = null; syncCropInputs(); } });
   tb.addEventListener('input', (e) => {
     const el = e.target; const st = current();
     if (el.dataset.f && st) { onStudentField(st, el.dataset.f, el.value); return; }
-    if (el.dataset.crop && st) { st.crop[el.dataset.crop] = +el.value; const o = $(`[data-crop-val="${el.dataset.crop}"]`); if (o) o.textContent = CROP_FMT[el.dataset.crop](+el.value); onCropChanged(st); return; }
+    if (el.dataset.crop && st) { const k = el.dataset.crop; st.crop[k] = k === 'zoom' ? clamp(Math.exp(+el.value), ZOOM_MIN, ZOOM_MAX) : +el.value; onCropChanged(st); return; }
     if (el.dataset.k) {
-      const k = el.dataset.k; const cur = getPath(state.settings, k);
+      const k = el.dataset.k; if (k === 'text.lang') return; // язык применяется по 'change' с подтверждением
+      const cur = getPath(state.settings, k);
       let v = el.type === 'checkbox' ? el.checked : el.type === 'range' || typeof cur === 'number' ? +el.value : el.value;
       if (typeof cur === 'number' && !Number.isFinite(v)) return;
       setPath(state.settings, k, v);
       const kv = $(`[data-kv="${k}"]`); const it = findSchemaItem(k); if (kv) kv.textContent = it ? fmtVal(it, v) : k === 'export.jpegQuality' ? `${Math.round(v * 100)}%` : v;
       onSettingsChanged(k);
-      if (k === 'back.caption' || k === 'text.template' || k === 'text.className') ensureFonts(String(v)).then(() => { fontsVer++; schedulePreview(); });
+      if (k === 'export.pattern') { const ex = $('#patternExample'); if (ex) ex.textContent = fileBaseName(state.students[0] || STUB) + '.png'; }
+      if (state.ui.tab === 'layout' && visSig() !== lastVisSig) rerenderKeepingFocus();
+      if (k === 'back.caption' || (k.startsWith('text.') && typeof v === 'string')) ensureFonts(String(v)); // догрузка глифов перерисует превью через loadingdone
     }
   });
   tb.addEventListener('change', (e) => {
     const el = e.target;
     if (el.dataset.k) {
       const k = el.dataset.k;
+      if (k === 'text.lang') { applyLanguage(el.value); return; }
       if (el.type === 'checkbox' || el.tagName === 'SELECT') {
         if (el.tagName === 'SELECT') { const cur = getPath(state.settings, k); setPath(state.settings, k, typeof cur === 'number' ? +el.value : el.value); onSettingsChanged(k); }
         if (k.startsWith('text.') && /Font$/.test(k)) ensureFonts().then(() => { fontsVer++; schedulePreview(); });
@@ -2541,6 +3079,7 @@ function bindUI() {
       return;
     }
     if (el.dataset.act === 'assign-select' && el.value) { const st = current(); if (st) assignPhoto(st, el.value); }
+    if (el.id === 'expClass') { state.ui.classFilter = el.value; renderList(); renderTab(); }
   });
   tb.addEventListener('click', (e) => {
     const g = e.target.closest('[data-gender]'); if (g) { const st = current(); if (st) setGender(st, g.dataset.gender); return; }
@@ -2554,6 +3093,7 @@ function bindUI() {
   $('#fileSingle').addEventListener('change', async (e) => {
     const f = e.target.files[0]; const st = state.students.find((s) => s.id === pickTargetId); if (!f || !st) return;
     await addPhotoFiles([f], { assignTo: st, quiet: true }); selectStudent(st.id); toast(`Фото назначено: ${st.nameNom || st.nameGen}`, 'ok');
+    if ($('#mBody') && imp.tab === 'table') refreshTablePhotoCells();
   });
   $('#fileCover').addEventListener('change', async (e) => {
     const f = e.target.files[0]; if (!f) return;
@@ -2564,10 +3104,13 @@ function bindUI() {
     } catch (er) { toast('Не удалось открыть изображение обложки', 'error'); }
   });
   $('#fileProject').addEventListener('change', (e) => { if (e.target.files[0]) openProject(e.target.files[0]); });
+  $('#fileTemplate').addEventListener('change', (e) => { if (e.target.files[0]) importTemplateFile(e.target.files[0]); });
   $('#fileTable').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const t = await readTableFile(f); if (t != null) { imp.text = t; imp.rolesManual = false; renderModalBody(); } });
   // модальное окно
+  let bgDown = false; // закрываем по фону, только если и нажали, и отпустили на фоне (а не выделяли текст)
+  $('#modalRoot').addEventListener('mousedown', (e) => { bgDown = e.target.matches('[data-modal-bg]'); });
   $('#modalRoot').addEventListener('click', (e) => {
-    if (e.target.matches('[data-modal-bg]') || e.target.closest('[data-close]')) { closeModal(); renderAll(); return; }
+    if ((e.target.matches('[data-modal-bg]') && bgDown) || e.target.closest('[data-close]')) { closeModal(); renderAll(); return; }
     const t = e.target.closest('[data-mtab]'); if (t) { imp.tab = t.dataset.mtab; renderModalBody(); return; }
     const m = e.target.closest('[data-mode]'); if (m) { imp.mode = m.dataset.mode; $$('#impMode [data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === imp.mode))); return; }
     const a = e.target.closest('[data-mact]'); if (!a || a.disabled) return;
@@ -2580,6 +3123,8 @@ function bindUI() {
       case 't-add': { const maxNum = Math.max(0, ...state.students.map((s) => +s.num || 0)); state.students.push(newStudent({ num: String(maxNum + 1) })); state.demo = false; renderModalBody(); saveState(); setTimeout(() => { const rows = $$('#mBody [data-tid]'); rows[rows.length - 1]?.querySelector('[data-tf="nameNom"]')?.focus(); }, 20); break; }
       case 't-decline': { let n = 0; for (const s of state.students) if (!s.nameGen && s.nameNom) { if (!s.gender) { const g = guessGender(s.nameNom); if (g) { s.gender = g; s.genderGuessed = true; } } const d = declineName(s.nameNom, s.gender); if (d) { s.nameGen = d; s.genGuessed = true; n++; } } renderModalBody(); saveState(); toast(`Просклонено: ${n}`, n ? 'ok' : 'info'); break; }
       case 't-gender': { let n = 0; for (const s of state.students) if (!s.gender) { const g = guessGender(s.nameNom || s.nameGen); if (g) { s.gender = g; s.genderGuessed = true; n++; } } renderModalBody(); saveState(); toast(`Пол определён: ${n}`, n ? 'ok' : 'info'); break; }
+      case 't-photo': if (st) pickSinglePhoto(st.id); break;
+      case 't-confirm': { let n = 0; for (const s of state.students) if (s.genGuessed || s.genderGuessed) { s.genGuessed = false; s.genderGuessed = false; n++; } renderModalBody(); saveState(); toast(n ? `Подтверждено: ${n}` : 'Нечего подтверждать', n ? 'ok' : 'info'); break; }
       case 't-renum': state.students.forEach((s, i) => { s.num = String(i + 1); }); autoMatch(); renderModalBody(); saveState(); break;
       case 't-copy': copyText(studentsToTsv()); break;
       case 't-clear': if (confirm('Удалить всех учеников из списка?')) { state.students = []; state.currentId = null; renderModalBody(); saveState(); } break;
@@ -2595,11 +3140,16 @@ function bindUI() {
     if (tr && el.dataset.tf) {
       const st = state.students.find((s) => s.id === tr.dataset.tid); if (!st) return;
       const f = el.dataset.tf;
-      if (f === 'gender') { st.gender = el.value; st.genderGuessed = false; if (st.genGuessed) { st.nameGen = declineName(st.nameNom, st.gender); st.genGuessed = !!st.nameGen; const gi = tr.querySelector('[data-tf="nameGen"]'); if (gi) gi.value = st.nameGen; } el.classList.remove('bg-amber-50', 'bg-red-50'); }
+      const gi = tr.querySelector('[data-tf="nameGen"]'), gs = tr.querySelector('[data-tf="gender"]');
+      if (f === 'gender') { st.gender = el.value; st.genderGuessed = false; if (st.genGuessed || !st.nameGen) { st.nameGen = declineName(st.nameNom, st.gender); st.genGuessed = !!st.nameGen; if (gi) gi.value = st.nameGen; } el.classList.remove('bg-amber-50', 'bg-red-50'); }
       else if (f === 'nameGen') { st.nameGen = el.value; st.genGuessed = false; el.classList.remove('bg-amber-50'); }
-      else if (f === 'nameNom') { st.nameNom = el.value; }
+      else if (f === 'nameNom') {
+        applyNameNom(st, el.value);
+        if (gi) { gi.value = st.nameGen; gi.classList.toggle('bg-amber-50', st.genGuessed); }
+        if (gs) { gs.value = st.gender; gs.classList.toggle('bg-amber-50', st.genderGuessed); gs.classList.toggle('bg-red-50', !st.gender); }
+      }
       else { st[f] = el.value.trim(); }
-      if (f === 'num' || f === 'fileName' || f === 'nameNom') autoMatchDebounced();
+      if (f === 'num' || f === 'fileName' || f === 'nameNom') autoMatchSoon();
       state.demo = false; saveState(); schedulePreview();
     }
   });
@@ -2611,13 +3161,13 @@ function bindUI() {
   });
   // клавиатура
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { if ($('#modalRoot').innerHTML) { closeModal(); renderAll(); } $('#projectMenu').classList.add('hidden'); if (state.ui.layoutMode) { state.ui.layoutMode = false; renderToolbar(); schedulePreview(); } return; }
+    if (e.key === 'Escape') { if ($('#modalRoot').innerHTML) { closeModal(); renderAll(); return; } $('#projectMenu').classList.add('hidden'); dragDepth = 0; hideDrop(); if (state.ui.layoutMode) { state.ui.layoutMode = false; renderToolbar(); schedulePreview(); } return; }
     if ($('#modalRoot').innerHTML) return;
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     const typing = /INPUT|TEXTAREA|SELECT/.test(tag) && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
     if (e.key === 'PageDown' || (e.altKey && e.key === 'ArrowDown')) { e.preventDefault(); stepStudent(1); }
     else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowUp')) { e.preventDefault(); stepStudent(-1); }
-    else if (!typing && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && document.activeElement && document.activeElement.closest && document.activeElement.closest('#studentList')) { e.preventDefault(); stepStudent(e.key === 'ArrowDown' ? 1 : -1); }
+    else if (!typing && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && document.activeElement && document.activeElement.closest && document.activeElement.closest('#studentList')) { e.preventDefault(); stepStudent(e.key === 'ArrowDown' ? 1 : -1, true); }
   });
   // вставка из буфера: таблица → окно импорта, картинка → фото текущего ученика
   document.addEventListener('paste', (e) => {
@@ -2629,7 +3179,6 @@ function bindUI() {
     if (text && (text.includes('\t') || text.split('\n').filter((l) => l.trim()).length > 1)) { e.preventDefault(); imp.rolesManual = false; openImportModal(text, 'paste'); }
   });
   // drag & drop файлов на страницу
-  let dragDepth = 0;
   window.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; dragDepth++; showDrop(); });
   window.addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) hideDrop(); });
   window.addEventListener('dragover', (e) => { if (hasFiles(e)) { e.preventDefault(); const onFrame = e.target === pv.canvas && current() && hitFrame(toPrint(e)); $('#dropHint').textContent = onFrame ? `Фото будет назначено: ${current().nameNom || current().nameGen}` : 'Фото будут автоматически сопоставлены с учениками'; } });
@@ -2641,11 +3190,18 @@ function bindUI() {
     if (e.target === pv.canvas && st && files.length === 1 && hitFrame(toPrint(e))) { await addPhotoFiles(files, { assignTo: st, quiet: true }); toast(`Фото назначено: ${st.nameNom || st.nameGen}`, 'ok'); }
     else await addPhotoFiles(files);
   });
+  window.addEventListener('dragend', () => { dragDepth = 0; hideDrop(); });
+  window.addEventListener('blur', () => { dragDepth = 0; hideDrop(); });
   window.addEventListener('beforeunload', (e) => { if (state.ui.busy) { e.preventDefault(); e.returnValue = ''; } });
   document.fonts && document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', () => { fontsVer++; schedulePreview(); });
 }
 const reparseImportDebounced = debounce(reparseImport, 150);
-const autoMatchDebounced = debounce(() => { autoMatch(); renderList(); }, 300);
+function tablePhotoCell(s) {
+  const ph = photoOf(s);
+  return ph ? `<span class="${ph.status === 'error' ? 'text-red-600' : 'text-emerald-700'}" title="${esc(s.matchInfo || '')}">${esc(ph.name)}</span>` : `<button class="btn btn-xs" data-mact="t-photo" title="Загрузить фото для этой строки">${icon('upload', 'h-3.5 w-3.5')}Загрузить</button>`;
+}
+function refreshTablePhotoCells() { for (const tr of $$('#mBody [data-tid]')) { const s = state.students.find((x) => x.id === tr.dataset.tid); const td = tr.querySelector('[data-photo-cell]'); if (s && td) td.innerHTML = tablePhotoCell(s); } }
+let dragDepth = 0;
 function showDrop() { const d = $('#dropOverlay'); d.classList.remove('hidden'); d.style.display = 'grid'; }
 function hideDrop() { const d = $('#dropOverlay'); d.classList.add('hidden'); d.style.display = ''; }
 
@@ -2662,13 +3218,14 @@ async function init() {
     state.demo = !!saved.demo;
   } else loadDemo();
   bindUI(); bindPreview(); renderAll(); layoutPreview();
+  await loadDefaultCover(); // встроенная обложка сразу; своя (если есть) заменит её ниже
   let custom = null; try { custom = await DB.kvGet('cover'); } catch (e) { /* нет IndexedDB */ }
-  if (custom && custom.blob) { try { await setCustomCover(custom.blob, false); state.cover.name = custom.name || state.cover.name; } catch (e) { await loadDefaultCover(); } }
-  else await loadDefaultCover();
+  if (custom && custom.blob) { try { await setCustomCover(custom.blob, false); state.cover.name = custom.name || state.cover.name; } catch (e) { /* остаётся встроенная */ } }
   try {
-    const recs = await DB.allPhotos();
-    for (const r of recs) if (r && r.blob) state.photos.set(r.id, { ...r, status: 'pending', thumb: null, thumbUrl: '' });
-  } catch (e) { console.warn('IndexedDB недоступна — фото не будут сохраняться между сессиями'); }
+    const recs = (await DB.allPhotos()).filter((r) => r && r.blob).sort((a, b) => (a.seq || 0) - (b.seq || 0));
+    for (const r of recs) state.photos.set(r.id, { ...r, status: 'pending', thumb: null, thumbUrl: '' });
+    photoSeq = Math.max(photoSeq, ...recs.map((r) => (r.seq || 0) + 1));
+  } catch (e) { console.warn('IndexedDB недоступна', e); toast('Хранилище браузера недоступно: фото не сохранятся после перезагрузки страницы (список и настройки сохранятся).', 'warn', 8000); }
   autoMatch(); renderAll(); processThumbs();
   ensureFonts(exportTextOf(state.students.slice(0, 40))).then(() => { fontsVer++; schedulePreview(); renderTab(true); });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});

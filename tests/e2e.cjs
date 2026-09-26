@@ -107,8 +107,12 @@ function jpegInfo(buf) {
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
+  // confirm → OK, prompt → название шаблона
+  page.on('dialog', (d) => d.accept(d.type() === 'prompt' ? (process.env.TPL_NAME || 'Тестовый шаблон') : undefined));
+  let blockJszip = false;
   await page.route('**/*', async (route) => {
     const url = route.request().url();
+    if (blockJszip && /jszip/i.test(url)) return route.abort();
     for (const [re, file] of ROUTES) if (re.test(url)) return route.fulfill({ path: file, contentType: 'application/javascript' });
     if (/fonts\.(googleapis|gstatic)\.com/.test(url) && process.env.NO_FONTS) return route.abort();
     if (FONTS_CSS && /fonts\.googleapis\.com\/css2/.test(url)) return route.fulfill({ body: FONTS_CSS, contentType: 'text/css' });
@@ -255,7 +259,79 @@ function jpegInfo(buf) {
   await page.keyboard.press('Escape');
   await page.evaluate(() => { DC.state.settings.text.plate = 'white'; DC.state.settings.frame.shape = 'oval'; });
 
-  console.log('9. Ошибки консоли');
+  console.log('9. Шаблоны: язык, школа, классы');
+  const lines = () => page.evaluate(() => DC.layoutText(document.createElement('canvas').getContext('2d'), DC.state.students[0]).items.map((i) => i.text));
+  await page.click('[data-tab="layout"]');
+  await page.selectOption('[data-k="text.lang"]', 'tg'); await page.waitForTimeout(200);
+  let L = await lines();
+  check(L[0] === 'Рӯзнома' && L.includes('хонандаи синфи 2 «Г»') && L.includes('Бобоҷон Ғафуров') && L.includes('Абдуллоев Сухроб'), 'таджикский шаблон: заголовок, класс, школа, ФИО в им. п.', L);
+  await page.selectOption('[data-k="text.lang"]', 'en'); await page.waitForTimeout(200);
+  L = await lines();
+  check(L[0] === 'School Diary' && L.includes('Abdulloev Sukhrob') && L.includes('Pupil of Grade 2 «Г»'), 'английский шаблон: ФИО латиницей', L);
+  const pfEn = await page.evaluate(() => { const s = DC.state.students.find((x) => x.nameNom.startsWith('Каримова')); const g = s.gender; s.gender = ''; const r = DC.preflight(s).map((i) => i.text); s.gender = g; return r; });
+  check(!pfEn.some((t) => /пол|падеж/i.test(t)), 'для английского пол и род. падеж не требуются', pfEn);
+  await page.selectOption('[data-k="text.lang"]', 'ru'); await page.waitForTimeout(200);
+  await page.fill('[data-k="text.school"]', 'средней школы №5\nг. Душанбе'); await page.fill('[data-k="text.className"]', '3 «А»'); await page.waitForTimeout(200);
+  L = await lines();
+  check(L.includes('ученика 3 «А» класса') && L.includes('средней школы №5') && L.includes('г. Душанбе') && L.includes('Абдуллоева Сухроба'), 'русский шаблон со своей школой и классом', L);
+  await page.click('[data-act="tpl-save"]'); await page.waitForTimeout(300);
+  const nTpl = await page.evaluate(() => JSON.parse(localStorage.getItem('dnevnik-creator:templates') || '[]').length);
+  check(nTpl === 1, 'шаблон сохранён в «Мои шаблоны»', nTpl);
+  await page.fill('[data-k="text.school"]', 'что-то другое'); await page.waitForTimeout(100);
+  await page.click('[data-act="tpl-apply"]'); await page.waitForTimeout(500);
+  const sch = await page.evaluate(() => DC.state.settings.text.school);
+  check(sch === 'средней школы №5\nг. Душанбе', 'применение шаблона восстанавливает школу', sch);
+  const tplPath = await dl(() => page.click('[data-act="tpl-export"]'));
+  const tplJson = JSON.parse(fs.readFileSync(tplPath, 'utf8'));
+  check(tplJson.app === 'dnevnik-creator-template' && tplJson.settings.text.className === '3 «А»', 'шаблон выгружается в .json', tplJson.name);
+  await page.setInputFiles('#fileTemplate', { name: 'tpl.json', mimeType: 'application/json', buffer: fs.readFileSync(tplPath) });
+  await page.waitForTimeout(800);
+  const nTpl2 = await page.evaluate(() => JSON.parse(localStorage.getItem('dnevnik-creator:templates') || '[]').length);
+  check(nTpl2 === 2, 'шаблон загружается из файла', nTpl2);
+  // несколько классов в одном списке
+  await page.evaluate(() => { DC.state.students[1].className = '4 «Б»'; DC.state.students[3].className = '4 «Б»'; DC.state.settings.export.scope = 'withPhoto'; DC.state.settings.export.batchFormat = 'zip-jpg'; });
+  await page.click('#studentList [data-id]'); // перерисовка списка
+  await page.click('[data-tab="export"]'); await page.waitForTimeout(300);
+  const cls = await page.evaluate(() => ({ opts: [...document.querySelectorAll('#classFilter option')].map((o) => o.textContent), line: DC.layoutText(document.createElement('canvas').getContext('2d'), DC.state.students[1]).items.map((i) => i.text) }));
+  check(cls.opts.length === 3 && cls.line.includes('ученицы 4 «Б» класса'), 'фильтр классов и класс ученика в надписи', cls);
+  const zip2 = await JSZip.loadAsync(fs.readFileSync(await dl(() => page.click('[data-action="export-batch"]'))));
+  const dirs = [...new Set(Object.keys(zip2.files).filter((n) => !zip2.files[n].dir).map((n) => n.split('/')[0]))];
+  check(dirs.length === 2 && dirs.some((d) => /4 «Б»/.test(d)) && dirs.some((d) => /3 «А»/.test(d)), 'ZIP разложен по папкам классов', dirs);
+  await page.selectOption('#expClass', '4 «Б»'); await page.waitForTimeout(200);
+  const n4 = await page.evaluate(() => document.querySelector('[data-action="export-batch"]').textContent);
+  check(/Экспортировать 2 /.test(n4), 'экспорт одного выбранного класса', n4);
+  await page.screenshot({ path: path.join(OUT, '07-classes.png') });
+
+  console.log('10. ZIP без CDN (запасной упаковщик)');
+  blockJszip = true;
+  await page.evaluate(() => { delete window.JSZip; DC.state.ui.classFilter = ''; DC.state.settings.export.batchFormat = 'zip-jpg'; DC.state.settings.export.scope = 'withPhoto'; });
+  await page.click('[data-tab="student"]'); await page.click('[data-tab="export"]');
+  const zipFallback = await JSZip.loadAsync(fs.readFileSync(await dl(() => page.click('[data-action="export-batch"]'))));
+  const zf = Object.keys(zipFallback.files).filter((n) => !zipFallback.files[n].dir);
+  const jb = await zipFallback.file(zf[0]).async('nodebuffer');
+  check(zf.length === 5 && jpegInfo(jb).w === 3508 && jpegInfo(jb).dx === 300, 'встроенный ZIP-упаковщик работает без JSZip', zf);
+  blockJszip = false;
+
+  console.log('11. Разбор таблиц, пол и склонение (регрессии)');
+  const R = await page.evaluate(() => {
+    const imp = (t) => { const rows = DC.parseDelimited(t); const d = DC.detectRoles(rows); return DC.rowsToStudents(d.header ? rows.slice(d.headerIndex + 1) : rows, d.roles, { autoGender: true, autoDecline: true }).map((s) => [s.num, s.nameNom, s.nameGen, s.gender, s.fileName, s.className]); };
+    return {
+      pipe: imp('Номер | ФИО_Именительный | ФИО_Родительный | Пол (М/Ж) | Имя_Файла\n1 | Абдуллоев Сухроб | Абдуллоева Сухроба | М | 1.jpg'),
+      title: imp('Список учащихся 2 «Г» класса\nНомер\tФИО_Именительный\tФИО_Родительный\tПол\tИмя_Файла\n1\tАбдуллоев Сухроб\tАбдуллоева Сухроба\tМ\t1.jpg\n2\tАзимова Мадина\tАзимовой Мадины\tЖ\t2.jpg'),
+      nikog: imp('1\tНикогосян Арам\tНикогосяна Арама\tМ\t1.jpg\n2\tАзимова Мадина\tАзимовой Мадины\tЖ\t2.jpg'),
+      split: imp('№\tФамилия\tИмя\tПол\tКласс\n1\tАзимова\tМадина\tЖ\t3А\n2\tСаидов\tҶамшед\tМ\t3А'),
+      decl: [['Цой Виктор', 'M'], ['Толстой Лев', 'M'], ['Черных Павел', 'M'], ['Иванова-Петрова Анна-Мария', 'F'], ['Азимова', 'F']].map(([n, g]) => DC.declineName(n, g)),
+      gender: ['Назарзода Нилуфар', 'Раҳимзода Ҳабибулла', 'Қурбонӣ Шаҳло', 'Раҳимов Фаррух'].map(DC.guessGender),
+    };
+  });
+  check(R.pipe[0] && R.pipe[0][1] === 'Абдуллоев Сухроб' && R.pipe[0][4] === '1.jpg', 'разделитель «|» распознаётся', R.pipe);
+  check(R.title.length === 2 && R.title[0][1] === 'Абдуллоев Сухроб', 'строка-название над таблицей пропускается', R.title);
+  check(R.nikog.length === 2 && R.nikog[0][1] === 'Никогосян Арам', '«Никогосян» не принимается за заголовок', R.nikog);
+  check(R.split.length === 2 && R.split[0][1] === 'Азимова Мадина' && R.split[0][5] === '3А', 'отдельные столбцы Фамилия/Имя и Класс', R.split);
+  check(JSON.stringify(R.decl) === JSON.stringify(['Цоя Виктора', 'Толстого Льва', 'Черных Павла', 'Ивановой-Петровой Анны-Марии', 'Азимовой']), 'склонение: Цой, Лев, Черных, двойные имена, одна фамилия', R.decl);
+  check(JSON.stringify(R.gender) === JSON.stringify(['F', 'M', 'F', 'M']), 'пол: Нилуфар, Ҳабибулла, Шаҳло, Фаррух', R.gender);
+
+  console.log('12. Ошибки консоли');
   const relevant = consoleErrors.filter((t) => !/fonts\.g|ERR_TUNNEL|net::ERR_/.test(t));
   check(relevant.length === 0, 'нет ошибок JavaScript в консоли', relevant);
 
